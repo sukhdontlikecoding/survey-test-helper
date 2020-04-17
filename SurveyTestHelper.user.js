@@ -26,7 +26,8 @@ const BUTTON_CODES = {
   right: 39,
   left: 37,
   up: 38,
-  down: 40
+  down: 40,
+  spacebar: 32
 };
 const COOKIE_ACTIVE_NAME = "STH_active";
 const COOKIE_ATTEMPTS_NAME = "STH_attempts";
@@ -59,7 +60,6 @@ let SurveyTestHelper = {
   errorDeactivateOverride: false,
   forceIndex: false,
   errorAlertShown: false,
-  uiContainer: undefined,
   initialize: function () {
     console.log("Initializing...");
     this.addErrorAlertListener();
@@ -68,26 +68,31 @@ let SurveyTestHelper = {
     
     this.initCookie();
     this.initUI();
-    
+
+    // Attach handlers
+    this.button.onclick = this.buttonActionHandler.bind(this);
+    document.onkeydown = this.buttonActionHandler.bind(this);
+
     document.body.appendChild(this.uiContainer);
 
-    if (this.active) {
-      this.inputDummyResponse();
-      this.clickNextButton();
-    } else {
-      this.getFocus();
-    }
+    // Delay the auto-run so that LS has a chance to properly manage its UI before we start
+    window.setTimeout(function () {
+      if (this.active) {
+        this.inputDummyResponse();
+        this.clickNextButton();
+      }
+    }.bind(this), 10);
   },
   initUI: function () {
-    let chkBoxActive = document.createElement("input");
-    chkBoxActive.type = "checkbox";
-    chkBoxActive.style["margin-left"] = "10px";
-    chkBoxActive.checked = this.active;
-    chkBoxActive.onclick = this.setActivity.bind(this);
+    this.activeCheckbox = document.createElement("input");
+    this.activeCheckbox.type = "checkbox";
+    this.activeCheckbox.style["margin-left"] = "10px";
+    this.activeCheckbox.checked = this.active;
+    this.activeCheckbox.onclick = this.setActivity.bind(this);
     
     let chkBoxLabel = document.createElement("label");
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
-    chkBoxLabel.appendChild(chkBoxActive);
+    chkBoxLabel.appendChild(this.activeCheckbox);
 
     this.uiContainer = document.createElement("DIV");
     this.alertDisplay = document.createElement("DIV");
@@ -113,7 +118,6 @@ let SurveyTestHelper = {
     this.button.style.display = "block";
     this.button.style.width = "100%";
     this.button.innerHTML = "Do Stuff";
-    this.button.onclick = this.button.onkeydown = this.buttonActionHandler.bind(this);
   
     this.uiContainer.appendChild(this.alertDisplay);
     this.uiContainer.appendChild(chkBoxLabel);
@@ -139,11 +143,6 @@ let SurveyTestHelper = {
       STH_Cookies.remove(COOKIE_ATTEMPTS_NAME);
     }
   },
-  getFocus: function () {
-    // Put the focus on the button so we can start catching inputs
-    console.log("Focusing...");
-    this.button.focus();
-  },
   setAlert: function (alertText = "Generic Error Alert.") {
     this.alertDisplay.innerHTML = alertText;
     this.alertDisplay.style.color = "#FF0000";
@@ -157,7 +156,8 @@ let SurveyTestHelper = {
     prevBtn.click();
   },
   setActivity: function (e) {
-    this.active = e.target.checked;
+    this.active = e.target ? e.target.checked : e;
+    this.activeCheckbox.checked = this.active;
     console.log("Activity changed: ", this.active);
 
     this.setCookieActivity(this.active);
@@ -186,6 +186,9 @@ let SurveyTestHelper = {
         break;
       case BUTTON_CODES.left:
         this.clickPrevButton();
+        break;
+      case BUTTON_CODES.spacebar:
+        this.setActivity(!this.active);
         break;
     }
   },
@@ -216,7 +219,7 @@ let SurveyTestHelper = {
         this.setAlert("Answer Invalid. Pausing run...");
         mutation.target.querySelector("div.modal-footer>a.btn.btn-default").click();
         if (!this.errorDeactivateOverride) {
-          this.setActivity({target:{checked:false}});
+          this.setActivity(false);
         }
       }
     });
@@ -353,7 +356,10 @@ let SurveyTestHelper = {
 
     // Clear the checkboxes before re-selecting them
     checkboxes.forEach(chkbox => {
-      chkbox.checked = false;
+      //chkbox.checked = false;
+      if (chkbox.checked) {
+        chkbox.click();
+      }
       if (chkbox.classList.contains("other-checkbox")) {
         chkbox.closest("div.answer-item").querySelector("input.text").value = "";
       }
@@ -368,7 +374,7 @@ let SurveyTestHelper = {
         }
         toBeChecked.push(r);
       }
-    } 
+    }
   }
 };
 
