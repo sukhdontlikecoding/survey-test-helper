@@ -13,14 +13,16 @@ const QUESTION_CLASSES = {
   "numeric": 2,
   "text-short": 3,
   "array-flexible-row": 4,
-  "multiple-opt": 5
+  "multiple-opt": 5,
+  "list-dropdown": 6
 };
 const QUESTION_TYPE = {
   radio: 1,
   numericInput: 2,
   shortFreeText: 3,
   array: 4,
-  mChoice: 5
+  mChoice: 5,
+  dropdown: 6
 };
 const BUTTON_CODES = {
   right: 39,
@@ -28,7 +30,8 @@ const BUTTON_CODES = {
   up: 38,
   down: 40,
   spacebar: 32,
-  enter: 13
+  enter: 13,
+  esc: 27
 };
 const COOKIE_ACTIVE_NAME = "STH_active";
 const COOKIE_ATTEMPTS_NAME = "STH_attempts";
@@ -79,7 +82,7 @@ let SurveyTestHelper = {
     // Delay the auto-run so that LS has a chance to properly manage its UI before we start
     window.setTimeout(function () {
       if (this.active) {
-        this.inputDummyResponse();
+        this.enterDummyResponse();
         this.clickNextButton();
       }
     }.bind(this), 10);
@@ -90,6 +93,7 @@ let SurveyTestHelper = {
     this.alertDisplay = document.createElement("div");
     this.activeCheckbox = document.createElement("input");
     this.button = document.createElement("button");
+    this.excludeContainer = document.createElement("div");
     let chkBoxLabel = document.createElement("label");
     
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
@@ -107,6 +111,7 @@ let SurveyTestHelper = {
     this.uiContainer.style["z-index"] = 2001;
     this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
     this.uiContainer.style["border-radius"] = "10px";
+    this.uiContainer.style["text-align"] = "center";
 
     this.infoDisplay.innerHTML = this.questionCode;
     this.infoDisplay.style.margin = "auto auto 10px";
@@ -119,14 +124,11 @@ let SurveyTestHelper = {
     this.infoDisplay.style["font-weight"] = "bold";
 
     this.alertDisplay.style["font-weight"] = "bold";
-    this.alertDisplay.style["border"] = "1px solid black";
-    this.alertDisplay.style["padding"] = "5px";
     this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.5)";
     this.alertDisplay.style["transition-duration"] = "0.75s";
-    this.alertDisplay.innerHTML = "Alerts go here.";
     this.alertDisplay.ontransitionend = function () {
-      this.alertDisplay.style.color = "#000000";
-    }.bind(this);
+      this.style.color = "#000000";
+    };
 
     this.activeCheckbox.type = "checkbox";
     this.activeCheckbox.style["margin-left"] = "10px";
@@ -164,15 +166,26 @@ let SurveyTestHelper = {
   },
   setAlert: function (alertText = "Generic Error Alert.") {
     this.alertDisplay.innerHTML = alertText;
+    this.alertDisplay.style.padding = "5px";
+    this.alertDisplay.style.border = "1px solid black";
     this.alertDisplay.style.color = "#FF0000";
   },
   clickNextButton: function () {
     let nextBtn = document.querySelector("#movenextbtn") || document.querySelector("#movesubmitbtn");
-    nextBtn.click();
+    
+    if (nextBtn) {
+      nextBtn.click();
+    } else {
+      if (this.active) {
+        this.clickPrevButton();
+      }
+    }
   },
   clickPrevButton: function () {
     let prevBtn = document.querySelector("#moveprevbtn");
-    prevBtn.click();
+    if (prevBtn) {
+      prevBtn.click();
+    }
   },
   setActivity: function (e) {
     this.active = e.target ? e.target.checked : e;
@@ -190,7 +203,7 @@ let SurveyTestHelper = {
         this.handleKeyDown(e.keyCode);
         break;
       case "click":
-        this.inputDummyResponse();
+        this.enterDummyResponse();
         this.clickNextButton();
         break;
       default:
@@ -200,7 +213,7 @@ let SurveyTestHelper = {
   handleKeyDown: function (keyCode) {
     switch (keyCode) {
       case BUTTON_CODES.right:
-        this.inputDummyResponse();
+        this.enterDummyResponse();
         // Fallthrough
       case BUTTON_CODES.enter:
         this.clickNextButton();
@@ -245,38 +258,40 @@ let SurveyTestHelper = {
       }
     });
   },
-  inputDummyResponse: function () {
+  enterDummyResponse: function () {
     let qType = this.getQuestionType();
 
     switch (qType) {
       case QUESTION_TYPE.radio:
-        console.log("Radio found.");
         this.selectRandomRadio();
         break;
       case QUESTION_TYPE.numericInput:
-        console.log("Numeric Input found.");
         this.enterNumericValue();
         break;
       case QUESTION_TYPE.shortFreeText:
-        console.log("Short Free Text found.");
         this.enterSFTValue();
         break;
       case QUESTION_TYPE.array:
-        console.log("Array found.");
         this.selectArrayOptions();
         break;
       case QUESTION_TYPE.mChoice:
-        console.log("Multiple Choice found.");
         this.selectMultipleChoiceOptions();
+        break;
+      case QUESTION_TYPE.dropdown:
+        this.selectRandomDropdown();
         break;
       default:
         console.log("Handleable question type not found.");
     }
   },
+  clearResponses: function () {
+    let qType = this.getQuestionType();
+
+
+  },
   selectRandomRadio: function () {
     let radioAttempts = this.attempts;
-    let ansList = document.querySelector(".answers-list");
-    let ans = ansList.getElementsByClassName("answer-item");
+    let ans = document.querySelectorAll("div.answers-list>div.answer-item");
     let r = 0;
     // Select a random answer option until we get one that's not hidden
     do {
@@ -308,7 +323,7 @@ let SurveyTestHelper = {
   enterNumericValue: function () {
     let numericAttempts = this.attempts;
     let inputVal = 0;
-    let inputElement = document.querySelector(".question-container input.numeric");
+    let inputElement = document.querySelector("div.question-container input.numeric");
     // 15% chance of returning refused option, if provided
     let generateNumericInput = function (min, max, refusedVal=undefined) {
       let returnVal = 0;
@@ -340,7 +355,7 @@ let SurveyTestHelper = {
         this.errorDeactivateOverride = true;
         break;
       case 2:
-        // Raw Age/ percentage?
+        // Raw Age or percentage?
         inputVal = generateNumericInput(18, 100);
         STH_Cookies.set(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
         this.errorDeactivateOverride = true;
@@ -354,7 +369,7 @@ let SurveyTestHelper = {
     inputElement.value = inputVal;
   },
   enterSFTValue: function () {
-    let inputElement = document.querySelector(".question-container input.text");
+    let inputElement = document.querySelector("div.question-container input.text");
     let curDate = new Date();
 
     inputElement.value = "DD at: " + (curDate.getMonth() + 1) + "-" + curDate.getDate() + " " + curDate.getHours() + ":" + curDate.getMinutes();
@@ -396,6 +411,11 @@ let SurveyTestHelper = {
         toBeChecked.push(r);
       }
     }
+  },
+  selectRandomDropdown: function () {
+    let dropdownElement = document.querySelector("div.question-container select.list-question-select");
+    
+    dropdownElement[roll(0, dropdownElement.length - 1)].selected = true;
   }
 };
 
