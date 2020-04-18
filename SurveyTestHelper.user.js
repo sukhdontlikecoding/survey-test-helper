@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name     Survey Test Helper
-// @version  1
+// @version  1.3
 // @grant    none
 // @include /^https?:\/\/.+\.com\/index\.php\/survey\/.*/
 // @include /^https?:\/\/.+\.com\/index\.php\/[0-9]{6}.*/
@@ -27,7 +27,8 @@ const BUTTON_CODES = {
   left: 37,
   up: 38,
   down: 40,
-  spacebar: 32
+  spacebar: 32,
+  enter: 13
 };
 const COOKIE_ACTIVE_NAME = "STH_active";
 const COOKIE_ATTEMPTS_NAME = "STH_attempts";
@@ -182,6 +183,8 @@ let SurveyTestHelper = {
     switch (keyCode) {
       case BUTTON_CODES.right:
         this.inputDummyResponse();
+        // Fallthrough
+      case BUTTON_CODES.enter:
         this.clickNextButton();
         break;
       case BUTTON_CODES.left:
@@ -216,7 +219,7 @@ let SurveyTestHelper = {
   alertFoundHandler: function (mutationList, observer) {
     mutationList.forEach(mutation => {
       if (mutation.attributeName === "style" && mutation.target.style.display !== "none") {
-        this.setAlert("Answer Invalid. Pausing run...");
+        this.setAlert("Answer Invalid." + (this.active ? " Pausing run..." : ""));
         mutation.target.querySelector("div.modal-footer>a.btn.btn-default").click();
         if (!this.errorDeactivateOverride) {
           this.setActivity(false);
