@@ -85,41 +85,59 @@ let SurveyTestHelper = {
     }.bind(this), 10);
   },
   initUI: function () {
+    this.uiContainer = document.createElement("div");
+    this.infoDisplay = document.createElement("div");
+    this.alertDisplay = document.createElement("div");
     this.activeCheckbox = document.createElement("input");
-    this.activeCheckbox.type = "checkbox";
-    this.activeCheckbox.style["margin-left"] = "10px";
-    this.activeCheckbox.checked = this.active;
-    this.activeCheckbox.onclick = this.setActivity.bind(this);
-    
+    this.button = document.createElement("button");
     let chkBoxLabel = document.createElement("label");
+    
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
+    chkBoxLabel.style["background-color"] = "rgba(255,255,255,0.7)";
+    chkBoxLabel.style["border-radius"] = "5px";
+    chkBoxLabel.style.padding = "0px 3px";
+    chkBoxLabel.style.margin = "5px 0px";
+    chkBoxLabel.style.cursor = "pointer";
     chkBoxLabel.appendChild(this.activeCheckbox);
-
-    this.uiContainer = document.createElement("DIV");
-    this.alertDisplay = document.createElement("DIV");
-    this.button = document.createElement("BUTTON");
     
    	this.uiContainer.style.position = "fixed";
-    this.uiContainer.style.padding = "12px";
+    this.uiContainer.style.padding = "7px";
     this.uiContainer.style.right = "25px";
     this.uiContainer.style.top = "75px";
     this.uiContainer.style["z-index"] = 2001;
     this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
     this.uiContainer.style["border-radius"] = "10px";
 
+    this.infoDisplay.innerHTML = this.questionCode;
+    this.infoDisplay.style.margin = "auto auto 10px";
+    this.infoDisplay.style.height = "40px";
+    this.infoDisplay.style.display = "inline-block";
+    this.infoDisplay.style.color = "floralwhite";
+    this.infoDisplay.style.padding = "10px";
+    this.infoDisplay.style["background-color"] = "orange";
+    this.infoDisplay.style["border-radius"] = "20px";
+    this.infoDisplay.style["font-weight"] = "bold";
+
     this.alertDisplay.style["font-weight"] = "bold";
     this.alertDisplay.style["border"] = "1px solid black";
     this.alertDisplay.style["padding"] = "5px";
+    this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.5)";
     this.alertDisplay.style["transition-duration"] = "0.75s";
     this.alertDisplay.innerHTML = "Alerts go here.";
     this.alertDisplay.ontransitionend = function () {
       this.alertDisplay.style.color = "#000000";
     }.bind(this);
 
+    this.activeCheckbox.type = "checkbox";
+    this.activeCheckbox.style["margin-left"] = "10px";
+    this.activeCheckbox.checked = this.active;
+    this.activeCheckbox.onclick = this.setActivity.bind(this);
+
     this.button.style.display = "block";
     this.button.style.width = "100%";
-    this.button.innerHTML = "Do Stuff";
+    this.button.innerHTML = "Input and Continue";
   
+    this.uiContainer.appendChild(this.infoDisplay);
     this.uiContainer.appendChild(this.alertDisplay);
     this.uiContainer.appendChild(chkBoxLabel);
     this.uiContainer.appendChild(this.button);
