@@ -287,38 +287,68 @@ let SurveyTestHelper = {
   clearResponses: function () {
     let qType = this.getQuestionType();
 
+    switch (qType) {
+      case QUESTION_TYPE.radio:
+        this.clearRadio();
+        break;
+      case QUESTION_TYPE.mChoice:
 
+        break;
+    }
   },
   selectRandomRadio: function () {
     let radioAttempts = this.attempts;
-    let ans = document.querySelectorAll("div.answers-list>div.answer-item");
+    let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
     let r = 0;
+    let optionFound = false;
+
+    this.clearRadio();
+
     // Select a random answer option until we get one that's not hidden
     do {
-      r = roll(0, ans.length);
+      r = roll(0, ansList.length);
       this.errorDeactivateOverride = false;
-      ans.item(r).querySelector("input.radio").checked = true;
-      if (ans.item(r).querySelector("input.text")) {
-        // Other option text input
-        switch (radioAttempts) {
-          case 0:
-            // DD Text
-            ans.item(r).querySelector("input.text").value = "Dummy Data";
-            STH_Cookies.set(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
-            this.errorDeactivateOverride = true;
-            break;
-          case 1:
-            // Generic age range
-            ans.item(r).querySelector("input.text").value = roll(18, 99);
-            STH_Cookies.set(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
-            this.errorDeactivateOverride = true;
-            break;
-          default:
-            // Generic year range
-            ans.item(r).querySelector("input.text").value = roll(1910, 2001);
+      if (!(ansList.item(r).style.display === "none")) {
+        ansList.item(r).querySelector("input.radio").checked = true;
+        let otherOpt = ansList.item(r).querySelector("input.text");
+        if (otherOpt) {
+          // Other option text input
+          switch (radioAttempts) {
+            case 0:
+              // DD Text
+              otherOpt.value = "Dummy Data";
+              STH_Cookies.set(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
+              this.errorDeactivateOverride = true;
+              break;
+            case 1:
+              // Generic age range
+              otherOpt.value = roll(18, 99);
+              STH_Cookies.set(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
+              this.errorDeactivateOverride = true;
+              break;
+            default:
+              // Generic year range
+              otherOpt.value = roll(1910, 2001);
+          }
         }
+        optionFound = true;
       }
-    } while (ans.item(r).style.display === "none");
+    } while (!optionFound);
+  },
+  clearRadio: function () {
+    let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
+    let ans;
+    for (let i = 0; i < ansList.length; i++) {
+      ans = ansList.item(i).querySelector("input.radio");
+      if (ans.checked) {
+        ans.checked = false;
+        let otherOpt = ansList.item(i).querySelector("input.text");
+        if (otherOpt) {
+          otherOpt.value = "";
+        }
+        break; 
+      }
+    }
   },
   enterNumericValue: function () {
     let numericAttempts = this.attempts;
@@ -392,7 +422,6 @@ let SurveyTestHelper = {
 
     // Clear the checkboxes before re-selecting them
     checkboxes.forEach(chkbox => {
-      //chkbox.checked = false;
       if (chkbox.checked) {
         chkbox.click();
       }
@@ -414,8 +443,15 @@ let SurveyTestHelper = {
   },
   selectRandomDropdown: function () {
     let dropdownElement = document.querySelector("div.question-container select.list-question-select");
-    
-    dropdownElement[roll(0, dropdownElement.length - 1)].selected = true;
+    let r = roll(0, dropdownElement.length - 1);
+    let option = dropdownElement[r];
+
+    while (!option.value) {
+      r = roll(0, dropdownElement.length - 1);
+      option = dropdownElement[r];
+    }
+
+    option.selected = true;
   }
 };
 
