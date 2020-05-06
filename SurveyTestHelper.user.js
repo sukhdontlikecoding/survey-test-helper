@@ -63,6 +63,7 @@ let SurveyTestHelper = {
   active: false,
   attempts: 0,
   questionCode: null,
+  questionType: null,
   errorDeactivateOverride: false,
   forceIndex: false,
   errorAlertShown: false,
@@ -71,7 +72,8 @@ let SurveyTestHelper = {
     this.addErrorAlertListener();
     this.questionCode = document.querySelector("span#QNameNumData");
     this.questionCode = this.questionCode ? this.questionCode.dataset.code : null;
-    
+
+    this.questionType = this.getQuestionType();
     this.initCookie();
     this.initUI();
 
@@ -263,9 +265,8 @@ let SurveyTestHelper = {
     });
   },
   enterDummyResponse: function () {
-    let qType = this.getQuestionType();
 
-    switch (qType) {
+    switch (this.questionType) {
       case QUESTION_TYPE.radio:
         this.selectRandomRadio();
         break;
@@ -289,14 +290,12 @@ let SurveyTestHelper = {
     }
   },
   clearResponses: function () {
-    let qType = this.getQuestionType();
-
-    switch (qType) {
+    switch (this.questionType) {
       case QUESTION_TYPE.radio:
         this.clearRadio();
         break;
       case QUESTION_TYPE.mChoice:
-
+        this.clearMChoice();
         break;
     }
   },
@@ -420,19 +419,12 @@ let SurveyTestHelper = {
   },
   selectMultipleChoiceOptions: function () {
     let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
-    let numToCheck = roll(1, Math.ceil(checkboxes.length/2));
+    let numToCheck = roll(1, Math.ceil(checkboxes.length / 2));
     let toBeChecked = [];
     let r = 0;
 
     // Clear the checkboxes before re-selecting them
-    checkboxes.forEach(chkbox => {
-      if (chkbox.checked) {
-        chkbox.click();
-      }
-      if (chkbox.classList.contains("other-checkbox")) {
-        chkbox.closest("div.answer-item").querySelector("input.text").value = "";
-      }
-    });
+    this.clearMChoice();
 
     while (toBeChecked.length < numToCheck) {
       r = roll(0, checkboxes.length);
@@ -444,6 +436,18 @@ let SurveyTestHelper = {
         toBeChecked.push(r);
       }
     }
+  },
+  clearMChoice: function () {
+    let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
+
+    checkboxes.forEach(chkbox => {
+      if (chkbox.checked) {
+        chkbox.click();
+      }
+      if (chkbox.classList.contains("other-checkbox")) {
+        chkbox.closest("div.answer-item").querySelector("input.text").value = "";
+      }
+    });
   },
   selectRandomDropdown: function () {
     let dropdownElement = document.querySelector("div.question-container select.list-question-select");
