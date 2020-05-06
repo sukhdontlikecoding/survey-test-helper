@@ -264,7 +264,8 @@ let SurveyTestHelper = {
     }
     if (questionText.includes(" many") 
       || questionText.includes(" much")
-      || questionText.includes(" number")) {
+      || questionText.includes(" number")
+      || questionText.includes("amount")) {
       context = Q_CONTEXT.quantity;
     }
     if (questionText.includes("year") || questionText.includes(" born") ) {
@@ -500,7 +501,7 @@ function generateNumericInput (min, max, refusedVal=-1) {
 };
 
 function getDateString () {
-  return String(curDate.getMonth() + 1).padStart(2, "0") + "-" + String(curDate.getDate()).padStart(2, "0") + " " + curDate.getHours() + ":" + curDate.getMinutes();
+  return String(curDate.getMonth() + 1).padStart(2, "0") + "-" + String(curDate.getDate()).padStart(2, "0") + " " + String(curDate.getHours()).padStart(2,"0") + ":" + String(curDate.getMinutes()).padStart(2,"0");
 }
 
 SurveyTestHelper.initialize();
