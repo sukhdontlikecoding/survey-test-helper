@@ -145,7 +145,7 @@ let SurveyTestHelper = {
   },
   initCookie: function () {
     let prevQuestion = sessionStorage.getItem("STH_qcode") || "Start";
-    let activity = sessionStorage.getItem(COOKIE_ACTIVE_NAME);
+    let activity = localStorage.getItem(COOKIE_ACTIVE_NAME);
     let attempts = sessionStorage.getItem(COOKIE_ATTEMPTS_NAME);
 
     sessionStorage.setItem("STH_qcode", this.questionCode);
@@ -154,7 +154,7 @@ let SurveyTestHelper = {
     if (activity) {
       this.active = (activity === "1");
     } else {
-      sessionStorage.setItem(COOKIE_ACTIVE_NAME, "0");
+      localStorage.setItem(COOKIE_ACTIVE_NAME, "0");
     }
     
     if (prevQuestion == this.questionCode) {
@@ -195,7 +195,7 @@ let SurveyTestHelper = {
     this.setCookieActivity(this.active);
   },
   setCookieActivity: function (activity) {
-    sessionStorage.setItem(COOKIE_ACTIVE_NAME, activity ? "1" : "0");
+    localStorage.setItem(COOKIE_ACTIVE_NAME, activity ? "1" : "0");
   },
   buttonActionHandler: function (e) {
     switch (e.type) {
