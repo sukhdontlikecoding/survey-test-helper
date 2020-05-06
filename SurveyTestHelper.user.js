@@ -4,7 +4,6 @@
 // @grant    none
 // @include /^https?:\/\/.+\.com\/index\.php\/survey\/.*/
 // @include /^https?:\/\/.+\.com\/index\.php\/[0-9]{6}.*/
-// @require https://cdn.jsdelivr.net/npm/js-cookie@rc/dist/js.cookie.min.js
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
@@ -38,23 +37,6 @@ const BUTTON_CODES = {
 const COOKIE_ACTIVE_NAME = "STH_active";
 const COOKIE_ATTEMPTS_NAME = "STH_attempts";
 
-// js-cookie noConflict example
-// https://github.com/js-cookie/js-cookie/wiki/Design-Patterns-To-Use-With-JavaScript-Cookie
-let STH_Cookies = function () {
-  InternalCookies = Cookies.noConflict();
-  return {
-    get: function(name) {
-      return InternalCookies.get(name);
-    },
-    set: function(name, value, attributes) {
-      InternalCookies.set(name, value, attributes);
-    },
-    remove: function(name, attributes) {
-      InternalCookies.remove(name, attributes);
-    }
-  };
-}();
-
 function roll (low, high) {
   return (Math.random() * (high - low) + low) | 0;
 };
@@ -62,6 +44,7 @@ function roll (low, high) {
 let SurveyTestHelper = {
   active: false,
   attempts: 0,
+  hidden: false,
   questionCode: null,
   questionType: null,
   errorDeactivateOverride: false,
@@ -112,8 +95,9 @@ let SurveyTestHelper = {
     
    	this.uiContainer.style.position = "fixed";
     this.uiContainer.style.padding = "7px";
-    this.uiContainer.style.right = "25px";
+    this.uiContainer.style.right = "0px";
     this.uiContainer.style.top = "75px";
+    this.uiContainer.style["margin-right"] = "15px";
     this.uiContainer.style["z-index"] = 2001;
     this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
     this.uiContainer.style["border-radius"] = "10px";
@@ -150,23 +134,23 @@ let SurveyTestHelper = {
     this.uiContainer.appendChild(this.alertDisplay);
   },
   initCookie: function () {
-    let prevQuestion = STH_Cookies.get("STH_qcode") || "begin";
-    let activity = STH_Cookies.get(COOKIE_ACTIVE_NAME);
-    let attempts = STH_Cookies.get(COOKIE_ATTEMPTS_NAME);
+    let prevQuestion = sessionStorage.getItem("STH_qcode") || "Start";
+    let activity = sessionStorage.getItem(COOKIE_ACTIVE_NAME);
+    let attempts = sessionStorage.getItem(COOKIE_ATTEMPTS_NAME);
 
-    STH_Cookies.set("STH_qcode", this.questionCode);
-    STH_Cookies.set("STH_prev_qcode", prevQuestion);
+    sessionStorage.setItem("STH_qcode", this.questionCode);
+    sessionStorage.setItem("STH_prev_qcode", prevQuestion);
     
     if (activity) {
       this.active = (activity === "1");
     } else {
-      STH_Cookies.set(COOKIE_ACTIVE_NAME, "0");
+      sessionStorage.setItem(COOKIE_ACTIVE_NAME, "0");
     }
     
     if (prevQuestion == this.questionCode) {
       this.attempts = Number(attempts);
     } else {
-      STH_Cookies.remove(COOKIE_ATTEMPTS_NAME);
+      sessionStorage.removeItem(COOKIE_ATTEMPTS_NAME);
     }
   },
   setAlert: function (alertText = "Generic Error Alert.") {
@@ -201,7 +185,7 @@ let SurveyTestHelper = {
     this.setCookieActivity(this.active);
   },
   setCookieActivity: function (activity) {
-    STH_Cookies.set(COOKIE_ACTIVE_NAME, activity ? "1" : "0");
+    sessionStorage.setItem(COOKIE_ACTIVE_NAME, activity ? "1" : "0");
   },
   buttonActionHandler: function (e) {
     switch (e.type) {
@@ -320,13 +304,13 @@ let SurveyTestHelper = {
             case 0:
               // DD Text
               otherOpt.value = "Dummy Data";
-              STH_Cookies.set(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
+              sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
               this.errorDeactivateOverride = true;
               break;
             case 1:
               // Generic age range
               otherOpt.value = roll(18, 99);
-              STH_Cookies.set(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
+              sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
               this.errorDeactivateOverride = true;
               break;
             default:
@@ -370,7 +354,7 @@ let SurveyTestHelper = {
 
     // If the input element is empty, we've reached a new question and the attempts cookie should be removed
     if (!inputElement.value) {
-      STH_Cookies.remove(COOKIE_ATTEMPTS_NAME);
+      sessionStorage.removeItem(COOKIE_ATTEMPTS_NAME);
       numericAttempts = 1;
     }
 
@@ -378,25 +362,25 @@ let SurveyTestHelper = {
       case 0:
         // Generic Age Year
         inputVal = generateNumericInput(1910, 2001, 9999);
-        STH_Cookies.set(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
+        sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
         this.errorDeactivateOverride = true;
         break;
       case 1:
         // AL Age Year
         inputVal = generateNumericInput(1910, 2001, 0);
-        STH_Cookies.set(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
+        sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
         this.errorDeactivateOverride = true;
         break;
       case 2:
         // Raw Age or percentage?
         inputVal = generateNumericInput(18, 100);
-        STH_Cookies.set(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
+        sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
         this.errorDeactivateOverride = true;
         break;
       default:
         // Generic valid Zip
         inputVal = 90210;
-        STH_Cookies.remove(COOKIE_ATTEMPTS_NAME);
+        sessionStorage.removeItem(COOKIE_ATTEMPTS_NAME);
     }
 
     inputElement.value = inputVal;
@@ -460,6 +444,18 @@ let SurveyTestHelper = {
     }
 
     option.selected = true;
+  },
+
+
+
+  toggleUI: function () {
+    if (this.hidden) {
+      this.uiContainer.style["margin-right"] = "15px";
+      this.hidden = false;
+    } else {
+      this.uiContainer.style["margin-right"] = "-" + (15 + this.uiContainer.offsetWidth) + "px";
+      this.hidden = true;
+    }
   }
 };
 
