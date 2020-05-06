@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name     Survey Test Helper
-// @version  1.3
+// @version  1.5
 // @grant    none
 // @include /^https?:\/\/.+\.com\/index\.php\/survey\/.*/
 // @include /^https?:\/\/.+\.com\/index\.php\/[0-9]{6}.*/
@@ -14,7 +14,8 @@ const QUESTION_CLASSES = {
   "text-short": 3,
   "array-flexible-row": 4,
   "multiple-opt": 5,
-  "list-dropdown": 6
+  "list-dropdown": 6,
+  "numeric-multi": 7
 };
 const QUESTION_TYPE = {
   radio: 1,
@@ -22,7 +23,8 @@ const QUESTION_TYPE = {
   shortFreeText: 3,
   array: 4,
   mChoice: 5,
-  dropdown: 6
+  dropdown: 6,
+  multiNumInput: 7
 };
 const BUTTON_CODES = {
   right: 39,
@@ -94,6 +96,7 @@ let SurveyTestHelper = {
     this.activeCheckbox = document.createElement("input");
     this.button = document.createElement("button");
     this.excludeContainer = document.createElement("div");
+    
     let chkBoxLabel = document.createElement("label");
     
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
@@ -102,6 +105,7 @@ let SurveyTestHelper = {
     chkBoxLabel.style.padding = "0px 3px";
     chkBoxLabel.style.margin = "5px 0px";
     chkBoxLabel.style.cursor = "pointer";
+    chkBoxLabel.style.display = "block";
     chkBoxLabel.appendChild(this.activeCheckbox);
     
    	this.uiContainer.style.position = "fixed";
@@ -114,7 +118,6 @@ let SurveyTestHelper = {
     this.uiContainer.style["text-align"] = "center";
 
     this.infoDisplay.innerHTML = this.questionCode;
-    this.infoDisplay.style.margin = "auto auto 10px";
     this.infoDisplay.style.height = "40px";
     this.infoDisplay.style.display = "inline-block";
     this.infoDisplay.style.color = "floralwhite";
@@ -140,9 +143,9 @@ let SurveyTestHelper = {
     this.button.innerHTML = "Input and Continue";
   
     this.uiContainer.appendChild(this.infoDisplay);
-    this.uiContainer.appendChild(this.alertDisplay);
     this.uiContainer.appendChild(chkBoxLabel);
     this.uiContainer.appendChild(this.button);
+    this.uiContainer.appendChild(this.alertDisplay);
   },
   initCookie: function () {
     let prevQuestion = STH_Cookies.get("STH_qcode") || "begin";
@@ -167,6 +170,7 @@ let SurveyTestHelper = {
   setAlert: function (alertText = "Generic Error Alert.") {
     this.alertDisplay.innerHTML = alertText;
     this.alertDisplay.style.padding = "5px";
+    this.alertDisplay.style["margin-top"] = "5px";
     this.alertDisplay.style.border = "1px solid black";
     this.alertDisplay.style.color = "#FF0000";
   },
@@ -354,11 +358,11 @@ let SurveyTestHelper = {
     let numericAttempts = this.attempts;
     let inputVal = 0;
     let inputElement = document.querySelector("div.question-container input.numeric");
-    // 15% chance of returning refused option, if provided
+    // 20% chance of returning refused option, if provided
     let generateNumericInput = function (min, max, refusedVal=undefined) {
       let returnVal = 0;
-      if (refusedVal === undefined) {
-        returnVal = (roll(0, 100) < 15) ? refusedVal : roll(min, max);
+      if (refusedVal) {
+        returnVal = (roll(0, 100) < 20) ? refusedVal : roll(min, max);
       } else {
         returnVal = roll(min, max);
       }
@@ -416,7 +420,7 @@ let SurveyTestHelper = {
   },
   selectMultipleChoiceOptions: function () {
     let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
-    let numToCheck = roll(1, checkboxes.length);
+    let numToCheck = roll(1, Math.ceil(checkboxes.length/2));
     let toBeChecked = [];
     let r = 0;
 
