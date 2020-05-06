@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name     Survey Test Helper
-// @version  1.5
+// @version  1.8
 // @grant    none
 // @include /^https?:\/\/.+\.com\/index\.php\/survey\/.*/
 // @include /^https?:\/\/.+\.com\/index\.php\/[0-9]{6}.*/
