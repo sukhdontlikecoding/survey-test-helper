@@ -32,14 +32,23 @@ const BUTTON_CODES = {
   down: 40,
   spacebar: 32,
   enter: 13,
-  esc: 27
+  esc: 27,
+  insert: 45
+};
+const Q_CONTEXT = {
+  age: 1,
+  year: 2,
+  zipCode: 3,
+  quantity: 4,
+  percent: 5,
+  yearRef: 6,
+  yearAL: 7
 };
 const COOKIE_ACTIVE_NAME = "STH_active";
 const COOKIE_ATTEMPTS_NAME = "STH_attempts";
 
-function roll (low, high) {
-  return (Math.random() * (high - low) + low) | 0;
-};
+let curDate = new Date();
+let validAgeYear = curDate.getFullYear() - 18;
 
 let SurveyTestHelper = {
   active: false,
@@ -97,6 +106,7 @@ let SurveyTestHelper = {
     this.uiContainer.style.padding = "7px";
     this.uiContainer.style.right = "0px";
     this.uiContainer.style.top = "75px";
+    this.uiContainer.style["transition-duration"] = "0.5s";
     this.uiContainer.style["margin-right"] = "15px";
     this.uiContainer.style["z-index"] = 2001;
     this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
@@ -201,19 +211,31 @@ let SurveyTestHelper = {
     }
   },
   handleKeyDown: function (keyCode) {
-    switch (keyCode) {
-      case BUTTON_CODES.right:
-        this.enterDummyResponse();
-        // Fallthrough
-      case BUTTON_CODES.enter:
-        this.clickNextButton();
-        break;
-      case BUTTON_CODES.left:
-        this.clickPrevButton();
-        break;
-      case BUTTON_CODES.spacebar:
-        this.setActivity(!this.active);
-        break;
+    if (this.hidden) {
+      if (keyCode === BUTTON_CODES.esc) {
+        this.toggleUI();
+      }
+    } else {
+      switch (keyCode) {
+        case BUTTON_CODES.right:
+          this.enterDummyResponse();
+          // Fallthrough
+        case BUTTON_CODES.enter:
+          this.clickNextButton();
+          break;
+        case BUTTON_CODES.left:
+          this.clickPrevButton();
+          break;
+        case BUTTON_CODES.spacebar:
+          this.setActivity(!this.active);
+          break;
+        case BUTTON_CODES.insert:
+          this.enterDummyResponse();
+          break;
+        case BUTTON_CODES.esc:
+          this.toggleUI();
+          break;
+      }
     }
   },
   getQuestionType: function () {
@@ -228,6 +250,33 @@ let SurveyTestHelper = {
       }
     }
     return undefined;
+  },
+  getQuestionContext: function () {
+    // Return a context enumeration based on what the question text contains
+    let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
+    let context = null;
+
+    if (questionText.includes("age") || questionText.includes("how old")) {
+      context = Q_CONTEXT.age;
+    }
+    if (questionText.includes("postal ") || questionText.includes("zip ")) {
+      context = Q_CONTEXT.zipCode;
+    }
+    if (questionText.includes(" many") 
+      || questionText.includes(" much")
+      || questionText.includes(" number")) {
+      context = Q_CONTEXT.quantity;
+    }
+    if (questionText.includes("year") || questionText.includes(" born") ) {
+      if (questionText.includes("9999")) {
+        context = Q_CONTEXT.yearRef;
+      } else if (questionText.includes("0000")) {
+        context = Q_CONTEXT.yearAL;
+      } else {
+        context = Q_CONTEXT.year;
+      }
+    }
+    return context;
   },
   addErrorAlertListener: function () {
     const alertElement = document.querySelector("#bootstrap-alert-box-modal");
@@ -284,7 +333,6 @@ let SurveyTestHelper = {
     }
   },
   selectRandomRadio: function () {
-    let radioAttempts = this.attempts;
     let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
     let r = 0;
     let optionFound = false;
@@ -294,28 +342,27 @@ let SurveyTestHelper = {
     // Select a random answer option until we get one that's not hidden
     do {
       r = roll(0, ansList.length);
-      this.errorDeactivateOverride = false;
       if (!(ansList.item(r).style.display === "none")) {
         ansList.item(r).querySelector("input.radio").checked = true;
         let otherOpt = ansList.item(r).querySelector("input.text");
         if (otherOpt) {
-          // Other option text input
-          switch (radioAttempts) {
-            case 0:
-              // DD Text
-              otherOpt.value = "Dummy Data";
-              sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
-              this.errorDeactivateOverride = true;
+          let context = this.getQuestionContext();
+          switch (context) {
+            case Q_CONTEXT.age:
+            case Q_CONTEXT.percent:
+              otherOpt.value = roll(18, 100);
               break;
-            case 1:
-              // Generic age range
-              otherOpt.value = roll(18, 99);
-              sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, radioAttempts + 1);
-              this.errorDeactivateOverride = true;
+            case Q_CONTEXT.year:
+              otherOpt.value = roll(1910, validAgeYear);
               break;
-            default:
-              // Generic year range
-              otherOpt.value = roll(1910, 2001);
+            case Q_CONTEXT.zipCode:
+              otherOpt.value = "90210";
+              break;
+            case Q_CONTEXT.quantity:
+              otherOpt.value = roll(0, 20);
+              break;
+            default:  // Generic string response
+              otherOpt.value = "Run at: " + getDateString();
           }
         }
         optionFound = true;
@@ -338,58 +385,39 @@ let SurveyTestHelper = {
     }
   },
   enterNumericValue: function () {
-    let numericAttempts = this.attempts;
     let inputVal = 0;
     let inputElement = document.querySelector("div.question-container input.numeric");
-    // 20% chance of returning refused option, if provided
-    let generateNumericInput = function (min, max, refusedVal=undefined) {
-      let returnVal = 0;
-      if (refusedVal) {
-        returnVal = (roll(0, 100) < 20) ? refusedVal : roll(min, max);
-      } else {
-        returnVal = roll(min, max);
-      }
-      return returnVal;
-    };
+    let context = this.getQuestionContext();
 
-    // If the input element is empty, we've reached a new question and the attempts cookie should be removed
-    if (!inputElement.value) {
-      sessionStorage.removeItem(COOKIE_ATTEMPTS_NAME);
-      numericAttempts = 1;
-    }
-
-    switch (numericAttempts) {
-      case 0:
-        // Generic Age Year
-        inputVal = generateNumericInput(1910, 2001, 9999);
-        sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
-        this.errorDeactivateOverride = true;
-        break;
-      case 1:
-        // AL Age Year
-        inputVal = generateNumericInput(1910, 2001, 0);
-        sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
-        this.errorDeactivateOverride = true;
-        break;
-      case 2:
-        // Raw Age or percentage?
+    switch (context) {
+      case Q_CONTEXT.age:
+      case Q_CONTEXT.percent:
         inputVal = generateNumericInput(18, 100);
-        sessionStorage.setItem(COOKIE_ATTEMPTS_NAME, numericAttempts + 1);
-        this.errorDeactivateOverride = true;
         break;
-      default:
-        // Generic valid Zip
+      case Q_CONTEXT.year:
+        inputVal = generateNumericInput(1910, validAgeYear);
+        break;
+      case Q_CONTEXT.zipCode:
         inputVal = 90210;
-        sessionStorage.removeItem(COOKIE_ATTEMPTS_NAME);
+        break;
+      case Q_CONTEXT.yearRef:
+        // Year except with a refused option
+        inputVal = generateNumericInput(1910, validAgeYear, 9999);
+        break;
+      case Q_CONTEXT.yearAL:
+        // Client-specific year w/ refused option
+        inputVal = generateNumericInput(1910, validAgeYear, 0);
+        break;
+      default:  // Probably a quantity or something
+        inputVal = roll(0, 20);
     }
 
     inputElement.value = inputVal;
   },
   enterSFTValue: function () {
     let inputElement = document.querySelector("div.question-container input.text");
-    let curDate = new Date();
 
-    inputElement.value = "DD at: " + (curDate.getMonth() + 1) + "-" + curDate.getDate() + " " + curDate.getHours() + ":" + curDate.getMinutes();
+    inputElement.value = "Run at: " + getDateString();
   },
   selectArrayOptions: function () {
     let arrayTable = document.querySelector("table.questions-list");
@@ -445,9 +473,6 @@ let SurveyTestHelper = {
 
     option.selected = true;
   },
-
-
-
   toggleUI: function () {
     if (this.hidden) {
       this.uiContainer.style["margin-right"] = "15px";
@@ -458,5 +483,24 @@ let SurveyTestHelper = {
     }
   }
 };
+
+function roll (min, max) {
+  return (Math.random() * (max - min) + min) | 0;
+};
+
+function generateNumericInput (min, max, refusedVal=-1) {
+  let returnVal = 0;
+  // 20% chance of returning refused option, if provided
+  if (refusedVal > -1) {
+    returnVal = (roll(0, 100) < 20) ? refusedVal : roll(min, max);
+  } else {
+    returnVal = roll(min, max);
+  }
+  return returnVal;
+};
+
+function getDateString () {
+  return String(curDate.getMonth() + 1).padStart(2, "0") + "-" + String(curDate.getDate()).padStart(2, "0") + " " + curDate.getHours() + ":" + curDate.getMinutes();
+}
 
 SurveyTestHelper.initialize();
