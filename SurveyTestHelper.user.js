@@ -44,8 +44,13 @@ const Q_CONTEXT = {
   yearRef: 6,
   yearAL: 7
 };
-const COOKIE_ACTIVE_NAME = "STH_active";
-const COOKIE_ATTEMPTS_NAME = "STH_attempts";
+const STH_COMMANDS = [
+  "avoid",
+  "force"
+];
+const ACTIVE_NAME = "STH_active";
+const ATTEMPTS_NAME = "STH_attempts";
+const COMMAND_NAME = "STH_commands";
 
 let curDate = new Date();
 let validAgeYear = curDate.getFullYear() - 18;
@@ -56,17 +61,19 @@ let SurveyTestHelper = {
   hidden: false,
   questionCode: null,
   questionType: null,
+  commands: null,
   errorDeactivateOverride: false,
-  forceIndex: false,
   errorAlertShown: false,
   initialize: function () {
     console.log("Initializing...");
     this.addErrorAlertListener();
     this.questionCode = document.querySelector("span#QNameNumData");
-    this.questionCode = this.questionCode ? this.questionCode.dataset.code : null;
+    this.questionCode = this.questionCode ? this.questionCode.dataset.code : "N/A";
 
     this.questionType = this.getQuestionType();
-    this.initCookie();
+    this.commands = this.queryCommands();
+
+    this.initStorage();
     this.initUI();
 
     // Attach handlers
@@ -143,10 +150,11 @@ let SurveyTestHelper = {
     this.uiContainer.appendChild(this.button);
     this.uiContainer.appendChild(this.alertDisplay);
   },
-  initCookie: function () {
+  initStorage: function () {
     let prevQuestion = sessionStorage.getItem("STH_qcode") || "Start";
-    let activity = localStorage.getItem(COOKIE_ACTIVE_NAME);
-    let attempts = sessionStorage.getItem(COOKIE_ATTEMPTS_NAME);
+    let attempts = sessionStorage.getItem(ATTEMPTS_NAME);
+    let activity = localStorage.getItem(ACTIVE_NAME);
+    let cmdObj = sessionStorage.getItem(COMMAND_NAME);
 
     sessionStorage.setItem("STH_qcode", this.questionCode);
     sessionStorage.setItem("STH_prev_qcode", prevQuestion);
@@ -154,13 +162,19 @@ let SurveyTestHelper = {
     if (activity) {
       this.active = (activity === "1");
     } else {
-      localStorage.setItem(COOKIE_ACTIVE_NAME, "0");
+      localStorage.setItem(ACTIVE_NAME, "0");
     }
     
     if (prevQuestion == this.questionCode) {
       this.attempts = Number(attempts);
     } else {
-      sessionStorage.removeItem(COOKIE_ATTEMPTS_NAME);
+      sessionStorage.removeItem(ATTEMPTS_NAME);
+    }
+
+    if (cmdObj) {
+      this.commands = JSON.parse(cmdObj);
+    } else {
+      sessionStorage.setItem(COMMAND_NAME, JSON.stringify(this.commands));
     }
   },
   setAlert: function (alertText = "Generic Error Alert.") {
@@ -192,10 +206,10 @@ let SurveyTestHelper = {
     this.activeCheckbox.checked = this.active;
     console.log("Activity changed: ", this.active);
 
-    this.setCookieActivity(this.active);
+    this.setStorageActivity(this.active);
   },
-  setCookieActivity: function (activity) {
-    localStorage.setItem(COOKIE_ACTIVE_NAME, activity ? "1" : "0");
+  setStorageActivity: function (activity) {
+    localStorage.setItem(ACTIVE_NAME, activity ? "1" : "0");
   },
   buttonActionHandler: function (e) {
     switch (e.type) {
@@ -335,6 +349,7 @@ let SurveyTestHelper = {
   },
   selectRandomRadio: function () {
     let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
+    let ansInputList = document.querySelectorAll("div.answers-list>div.answer-item input.radio");
     let r = 0;
     let optionFound = false;
 
@@ -342,32 +357,30 @@ let SurveyTestHelper = {
 
     // Select a random answer option until we get one that's not hidden
     do {
-      r = roll(0, ansList.length);
-      if (!(ansList.item(r).style.display === "none")) {
-        ansList.item(r).querySelector("input.radio").checked = true;
-        let otherOpt = ansList.item(r).querySelector("input.text");
-        if (otherOpt) {
-          let context = this.getQuestionContext();
-          switch (context) {
-            case Q_CONTEXT.age:
-            case Q_CONTEXT.percent:
-              otherOpt.value = roll(18, 100);
-              break;
-            case Q_CONTEXT.year:
-              otherOpt.value = roll(1910, validAgeYear);
-              break;
-            case Q_CONTEXT.zipCode:
-              otherOpt.value = "90210";
-              break;
-            case Q_CONTEXT.quantity:
-              otherOpt.value = roll(0, 20);
-              break;
-            default:  // Generic string response
-              otherOpt.value = "Run at: " + getDateString();
-          }
+      r = this.generateValidIndex(ansInputList);
+      ansList.item(r).querySelector("input.radio").checked = true;
+      let otherOpt = ansList.item(r).querySelector("input.text");
+      if (otherOpt) {
+        let context = this.getQuestionContext();
+        switch (context) {
+          case Q_CONTEXT.age:
+          case Q_CONTEXT.percent:
+            otherOpt.value = roll(18, 100);
+            break;
+          case Q_CONTEXT.year:
+            otherOpt.value = roll(1910, validAgeYear);
+            break;
+          case Q_CONTEXT.zipCode:
+            otherOpt.value = "90210";
+            break;
+          case Q_CONTEXT.quantity:
+            otherOpt.value = roll(0, 20);
+            break;
+          default:  // Generic string response
+            otherOpt.value = "Run at: " + getDateString();
         }
-        optionFound = true;
       }
+      optionFound = true;
     } while (!optionFound);
   },
   clearRadio: function () {
@@ -482,6 +495,55 @@ let SurveyTestHelper = {
       this.uiContainer.style["margin-right"] = "-" + (15 + this.uiContainer.offsetWidth) + "px";
       this.hidden = true;
     }
+  },
+  queryCommands: function () {
+    // commands are html tags with data attributes of the same name containing
+    // question codes and answer codes in the form "QX,1,2,3|QX2,1,2,3"
+    let commandList = document.querySelectorAll(STH_COMMANDS.join(","));
+    let commandContainer = {};
+    for (let x = 0; x < STH_COMMANDS.length; x++) {
+      commandContainer[STH_COMMANDS[x]] = {};
+    }
+    
+    if (commandList.length > 0) {
+      commandList.forEach(cmd => {
+        let tempCmd = {};
+        let questionData = cmd.dataset[cmd.localName].split("|");
+        
+        for (let i = 0; i < questionData.length; i++) {
+          let arrTemp = questionData[i].split(" ").join("").split(",");
+          let qName = arrTemp.shift();
+          
+          tempCmd[qName] = arrTemp;
+        }
+
+        commandContainer[cmd.localName] = tempCmd;
+      });
+    }
+
+    return commandContainer;
+  },
+  generateValidIndex: function (ansValList) {
+    let ind = roll(0, ansValList.length);
+    while (ansValList[ind].offsetWidth == 0 || ansValList[ind].offsetHeight == 0 ) {
+      ind = roll(0, ansValList.length);
+    }
+    
+    if (this.commands.force[this.questionCode]) {
+      for (let i = 0; i < ansValList.length; i++) {
+        if (this.commands.force[this.questionCode][0] == ansValList[i].value) {
+          return i;
+        }
+      }
+    }
+    if (this.commands.avoid[this.questionCode]) {
+      let restrictedVals = this.commands.avoid[this.questionCode];
+      while (restrictedVals.includes(ansValList[ind].value) || ansValList[ind].offsetWidth == 0 || ansValList[ind].offsetHeight == 0 ) {
+        ind = roll(0, ansValList.length);
+      }
+    }
+
+    return ind;
   }
 };
 
@@ -501,7 +563,10 @@ function generateNumericInput (min, max, refusedVal=-1) {
 };
 
 function getDateString () {
-  return String(curDate.getMonth() + 1).padStart(2, "0") + "-" + String(curDate.getDate()).padStart(2, "0") + " " + String(curDate.getHours()).padStart(2,"0") + ":" + String(curDate.getMinutes()).padStart(2,"0");
+  return String(curDate.getMonth() + 1).padStart(2, "0") + "-" +
+    String(curDate.getDate()).padStart(2, "0") + " " +
+    String(curDate.getHours()).padStart(2,"0") + ":" +
+    String(curDate.getMinutes()).padStart(2,"0");
 }
 
 SurveyTestHelper.initialize();
