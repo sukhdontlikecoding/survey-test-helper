@@ -185,8 +185,10 @@ let SurveyTestHelper = {
             }
           }
         }
+        sessionStorage.setItem(COMMAND_OBJ_NAME, JSON.stringify(this.commands));
+      } else {
+        this.commands = JSON.parse(cmdObjStr);
       }
-      sessionStorage.setItem(COMMAND_OBJ_NAME, JSON.stringify(this.commands));
     } else {
       sessionStorage.setItem(COMMAND_OBJ_NAME, JSON.stringify(this.commands));
     }
