@@ -50,7 +50,7 @@ const STH_COMMANDS = [
 ];
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
-const COMMAND_NAME = "STH_commands";
+const COMMAND_OBJ_NAME = "STH_commands";
 
 let curDate = new Date();
 let validAgeYear = curDate.getFullYear() - 18;
@@ -62,6 +62,7 @@ let SurveyTestHelper = {
   questionCode: null,
   questionType: null,
   commands: null,
+  commandsFound: false,
   errorDeactivateOverride: false,
   errorAlertShown: false,
   initialize: function () {
@@ -154,7 +155,7 @@ let SurveyTestHelper = {
     let prevQuestion = sessionStorage.getItem("STH_qcode") || "Start";
     let attempts = sessionStorage.getItem(ATTEMPTS_NAME);
     let activity = localStorage.getItem(ACTIVE_NAME);
-    let cmdObj = sessionStorage.getItem(COMMAND_NAME);
+    let cmdObjStr = sessionStorage.getItem(COMMAND_OBJ_NAME);
 
     sessionStorage.setItem("STH_qcode", this.questionCode);
     sessionStorage.setItem("STH_prev_qcode", prevQuestion);
@@ -171,10 +172,23 @@ let SurveyTestHelper = {
       sessionStorage.removeItem(ATTEMPTS_NAME);
     }
 
-    if (cmdObj) {
-      this.commands = JSON.parse(cmdObj);
+    if (cmdObjStr) {
+      if (this.commandsFound) {
+        let cmdObj = JSON.parse(cmdObjStr);
+
+        // If the current set of commands is missing something 
+        // from the stored commands, add them in
+        for (const cmd in cmdObj) {
+          for (const qCode in cmdObj[cmd]) {
+            if (!this.commands[cmd][qCode]) {
+              this.commands[cmd][qCode] = cmdObj[cmd][qCode];
+            }
+          }
+        }
+      }
+      sessionStorage.setItem(COMMAND_OBJ_NAME, JSON.stringify(this.commands));
     } else {
-      sessionStorage.setItem(COMMAND_NAME, JSON.stringify(this.commands));
+      sessionStorage.setItem(COMMAND_OBJ_NAME, JSON.stringify(this.commands));
     }
   },
   setAlert: function (alertText = "Generic Error Alert.") {
@@ -502,7 +516,7 @@ let SurveyTestHelper = {
     let commandList = document.querySelectorAll(STH_COMMANDS.join(","));
     let commandContainer = {};
     for (let x = 0; x < STH_COMMANDS.length; x++) {
-      commandContainer[STH_COMMANDS[x]] = {};
+      commandContainer[STH_COMMANDS[x]] = null;
     }
     
     if (commandList.length > 0) {
@@ -519,6 +533,7 @@ let SurveyTestHelper = {
 
         commandContainer[cmd.localName] = tempCmd;
       });
+      this.commandsFound = true;
     }
 
     return commandContainer;
@@ -529,14 +544,14 @@ let SurveyTestHelper = {
       ind = roll(0, ansValList.length);
     }
     
-    if (this.commands.force[this.questionCode]) {
+    if (this.commands.force && this.commands.force[this.questionCode]) {
       for (let i = 0; i < ansValList.length; i++) {
         if (this.commands.force[this.questionCode][0] == ansValList[i].value) {
           return i;
         }
       }
     }
-    if (this.commands.avoid[this.questionCode]) {
+    if (this.commands.avoid && this.commands.avoid[this.questionCode]) {
       let restrictedVals = this.commands.avoid[this.questionCode];
       while (restrictedVals.includes(ansValList[ind].value) || ansValList[ind].offsetWidth == 0 || ansValList[ind].offsetHeight == 0 ) {
         ind = roll(0, ansValList.length);
