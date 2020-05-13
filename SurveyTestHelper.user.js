@@ -1,7 +1,9 @@
 // ==UserScript==
-// @name     Survey Test Helper
-// @version  2.0
-// @grant    none
+// @name    Survey Test Helper
+// @version 2.1
+// @grant   none
+// @locale  en
+// @description A tool to help with survey testing
 // @include /^https?:\/\/.+\.com\/index\.php\/survey\/.*/
 // @include /^https?:\/\/.+\.com\/index\.php\/[0-9]{6}.*/
 // ==/UserScript==
@@ -42,7 +44,8 @@ const Q_CONTEXT = {
   quantity: 4,
   percent: 5,
   yearRef: 6,
-  yearAL: 7
+  yearAL: 7,
+  scale: 8
 };
 const STH_COMMANDS = [
   "avoid",
@@ -51,6 +54,7 @@ const STH_COMMANDS = [
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
 const COMMAND_OBJ_NAME = "STH_commands";
+const STH_HIDDEN = "STH_hidden";
 
 let curDate = new Date();
 let validAgeYear = curDate.getFullYear() - 18;
@@ -63,6 +67,7 @@ let SurveyTestHelper = {
   questionType: null,
   commands: null,
   commandsFound: false,
+  infoElements: [],
   errorDeactivateOverride: false,
   errorAlertShown: false,
   initialize: function () {
@@ -76,6 +81,7 @@ let SurveyTestHelper = {
 
     this.initStorage();
     this.initUI();
+    this.initQuestionInfoDisplay();
 
     // Attach handlers
     this.button.onclick = this.buttonActionHandler.bind(this);
@@ -109,17 +115,6 @@ let SurveyTestHelper = {
     chkBoxLabel.style.cursor = "pointer";
     chkBoxLabel.style.display = "block";
     chkBoxLabel.appendChild(this.activeCheckbox);
-    
-   	this.uiContainer.style.position = "fixed";
-    this.uiContainer.style.padding = "7px";
-    this.uiContainer.style.right = "0px";
-    this.uiContainer.style.top = "75px";
-    this.uiContainer.style["transition-duration"] = "0.5s";
-    this.uiContainer.style["margin-right"] = "15px";
-    this.uiContainer.style["z-index"] = 2001;
-    this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
-    this.uiContainer.style["border-radius"] = "10px";
-    this.uiContainer.style["text-align"] = "center";
 
     this.infoDisplay.innerHTML = this.questionCode;
     this.infoDisplay.style.height = "40px";
@@ -150,11 +145,33 @@ let SurveyTestHelper = {
     this.uiContainer.appendChild(chkBoxLabel);
     this.uiContainer.appendChild(this.button);
     this.uiContainer.appendChild(this.alertDisplay);
+
+    this.uiContainer.style.position = "fixed";
+    this.uiContainer.style.padding = "7px";
+    this.uiContainer.style.right = "0px";
+    this.uiContainer.style.top = "75px";
+    this.uiContainer.style["margin-right"] = this.hidden ? "-100%" : marginRightOffset.toString() + "px";
+    this.uiContainer.style["transition-duration"] = "0.5s";
+    this.uiContainer.style["z-index"] = 2001;
+    this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
+    this.uiContainer.style["border-radius"] = "10px";
+    this.uiContainer.style["text-align"] = "center";
+  },
+  initQuestionInfoDisplay: function () {
+    switch (this.questionType) {
+      case QUESTION_TYPE.array:
+        this.generateArrayInfoDisplay();
+        break;
+      default:
+        console.log("Question type for info display not found.");
+    }
   },
   initStorage: function () {
+    let activity = localStorage.getItem(ACTIVE_NAME);
+    let hiddenVal = localStorage.getItem(STH_HIDDEN);
+
     let prevQuestion = sessionStorage.getItem("STH_qcode") || "Start";
     let attempts = sessionStorage.getItem(ATTEMPTS_NAME);
-    let activity = localStorage.getItem(ACTIVE_NAME);
     let cmdObjStr = sessionStorage.getItem(COMMAND_OBJ_NAME);
 
     sessionStorage.setItem("STH_qcode", this.questionCode);
@@ -164,6 +181,12 @@ let SurveyTestHelper = {
       this.active = (activity === "1");
     } else {
       localStorage.setItem(ACTIVE_NAME, "0");
+    }
+
+    if (hiddenVal) {
+      this.hidden = (hiddenVal === "1");
+    } else {
+      localStorage.setItem(STH_HIDDEN, "0");
     }
     
     if (prevQuestion == this.questionCode) {
@@ -226,6 +249,25 @@ let SurveyTestHelper = {
   },
   setStorageActivity: function (activity) {
     localStorage.setItem(ACTIVE_NAME, activity ? "1" : "0");
+  },  
+  toggleUI: function () {
+    if (this.hidden) {
+      this.showUI();
+    } else {
+      this.hideUI();
+    }
+    this.setStorageHidden(this.hidden);
+  },
+  setStorageHidden: function (val) {
+    localStorage.setItem(STH_HIDDEN, val ? "1" : "0");
+  },
+  showUI: function () {
+    this.uiContainer.style["margin-right"] = marginRightOffset.toString() + "px";
+    this.hidden = false;
+  },
+  hideUI: function () {
+    this.uiContainer.style["margin-right"] = "-" + (marginRightOffset + this.uiContainer.offsetWidth).toString() + "px";
+    this.hidden = true;
   },
   buttonActionHandler: function (e) {
     switch (e.type) {
@@ -307,6 +349,9 @@ let SurveyTestHelper = {
         context = Q_CONTEXT.year;
       }
     }
+    if (questionText.includes("a scale")) {
+      context = Q_CONTEXT.scale;
+    }
     return context;
   },
   addErrorAlertListener: function () {
@@ -329,7 +374,6 @@ let SurveyTestHelper = {
     });
   },
   enterDummyResponse: function () {
-
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
         this.selectRandomRadio();
@@ -366,38 +410,56 @@ let SurveyTestHelper = {
   selectRandomRadio: function () {
     let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
     let ansInputList = document.querySelectorAll("div.answers-list>div.answer-item input.radio");
-    let r = 0;
-    let optionFound = false;
+    let r = roll(0, ansInputList.length);
+    let forced = false;
 
     this.clearRadio();
 
-    // Select a random answer option until we get one that's not hidden
-    do {
-      r = this.generateValidIndex(ansInputList);
-      ansList.item(r).querySelector("input.radio").checked = true;
-      let otherOpt = ansList.item(r).querySelector("input.text");
-      if (otherOpt) {
-        let context = this.getQuestionContext();
-        switch (context) {
-          case Q_CONTEXT.age:
-          case Q_CONTEXT.percent:
-            otherOpt.value = roll(18, 100);
-            break;
-          case Q_CONTEXT.year:
-            otherOpt.value = roll(1910, validAgeYear);
-            break;
-          case Q_CONTEXT.zipCode:
-            otherOpt.value = "90210";
-            break;
-          case Q_CONTEXT.quantity:
-            otherOpt.value = roll(0, 20);
-            break;
-          default:  // Generic string response
-            otherOpt.value = "Run at: " + getDateString();
+    // Checks to see whether the option found is hidden or not
+    while (ansInputList[r].offsetWidth == 0 || ansInputList[r].offsetHeight == 0 ) {
+      r = roll(0, ansInputList.length);
+    }
+    
+    if (this.commands.force && this.commands.force[this.questionCode]) {
+      for (let i = 0; i < ansInputList.length; i++) {
+        if (this.commands.force[this.questionCode][0] == ansInputList[i].value) {
+          r = i;
+          forced = true;
         }
       }
-      optionFound = true;
-    } while (!optionFound);
+    }
+    if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
+      let restrictedVals = this.commands.avoid[this.questionCode];
+      while (restrictedVals.includes(ansInputList[r].value) || ansInputList[r].offsetWidth == 0 || ansInputList[r].offsetHeight == 0 ) {
+        r = roll(0, ansInputList.length);
+      }
+    }
+
+    ansList.item(r).querySelector("input.radio").checked = true;
+    let otherOpt = ansList.item(r).querySelector("input.text");
+    if (otherOpt) {
+      let context = this.getQuestionContext();
+      switch (context) {
+        case Q_CONTEXT.age:
+        case Q_CONTEXT.percent:
+          otherOpt.value = roll(18, 100);
+          break;
+        case Q_CONTEXT.year:
+          otherOpt.value = roll(1910, validAgeYear);
+          break;
+        case Q_CONTEXT.zipCode:
+          otherOpt.value = "90210";
+          break;
+        case Q_CONTEXT.quantity:
+          otherOpt.value = roll(0, 20);
+          break;
+        case Q_CONTEXT.scale:
+          otherOpt.value = roll(0, 100);
+          break;
+        default:  // Generic string response
+          otherOpt.value = "Run at: " + getDateString();
+      }
+    }
   },
   clearRadio: function () {
     let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
@@ -464,7 +526,7 @@ let SurveyTestHelper = {
     let numToCheck = roll(1, Math.ceil(checkboxes.length / 2));
     let toBeChecked = [];
     let r = 0;
-
+    
     // Clear the checkboxes before re-selecting them
     this.clearMChoice();
 
@@ -503,15 +565,6 @@ let SurveyTestHelper = {
 
     option.selected = true;
   },
-  toggleUI: function () {
-    if (this.hidden) {
-      this.uiContainer.style["margin-right"] = "15px";
-      this.hidden = false;
-    } else {
-      this.uiContainer.style["margin-right"] = "-" + (15 + this.uiContainer.offsetWidth) + "px";
-      this.hidden = true;
-    }
-  },
   queryCommands: function () {
     // commands are html tags with data attributes of the same name containing
     // question codes and answer codes in the form "QX,1,2,3|QX2,1,2,3"
@@ -540,27 +593,24 @@ let SurveyTestHelper = {
 
     return commandContainer;
   },
-  generateValidIndex: function (ansValList) {
-    let ind = roll(0, ansValList.length);
-    while (ansValList[ind].offsetWidth == 0 || ansValList[ind].offsetHeight == 0 ) {
-      ind = roll(0, ansValList.length);
-    }
-    
-    if (this.commands.force && this.commands.force[this.questionCode]) {
-      for (let i = 0; i < ansValList.length; i++) {
-        if (this.commands.force[this.questionCode][0] == ansValList[i].value) {
-          return i;
-        }
-      }
-    }
-    if (this.commands.avoid && this.commands.avoid[this.questionCode]) {
-      let restrictedVals = this.commands.avoid[this.questionCode];
-      while (restrictedVals.includes(ansValList[ind].value) || ansValList[ind].offsetWidth == 0 || ansValList[ind].offsetHeight == 0 ) {
-        ind = roll(0, ansValList.length);
-      }
-    }
+  generateArrayInfoDisplay: function () {
+    let rows = document.querySelectorAll("tbody > tr");
+    for (let i = 0; i < rows.length; i++) {
+      let infoDiv = document.createElement("div");
+      infoDiv.innerHTML = rows[i].id.substring(26);
+      infoDiv.style.position = "absolute";
+      infoDiv.style.right = "100%";
+      infoDiv.style.padding = "3px 5px";
+      infoDiv.style.color = "white";
+      infoDiv.style.opacity = 0.75;
+      infoDiv.style["background-color"] = "orangered";
+      infoDiv.style["border-radius"] = "50% 0 0 10%";
+      infoDiv.style["font-weight"] = "bold";
 
-    return ind;
+      rows[i].appendChild(infoDiv);
+
+      this.infoElements.push(infoDiv);
+    }
   }
 };
 
@@ -585,5 +635,7 @@ function getDateString () {
     String(curDate.getHours()).padStart(2,"0") + ":" +
     String(curDate.getMinutes()).padStart(2,"0");
 }
+
+var marginRightOffset = 15;
 
 SurveyTestHelper.initialize();
