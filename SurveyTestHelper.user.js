@@ -595,9 +595,10 @@ let SurveyTestHelper = {
   },
   generateArrayInfoDisplay: function () {
     let rows = document.querySelectorAll("tbody > tr");
+    let qID = document.querySelector("div.question-container").id.replace("question","");
     for (let i = 0; i < rows.length; i++) {
       let infoDiv = document.createElement("div");
-      infoDiv.innerHTML = rows[i].id.substring(26);
+      infoDiv.innerHTML = rows[i].id.replace(new RegExp("[a-zA-Z]+[0-9]+X[0-9]+X" + qID), "");
       infoDiv.style.position = "absolute";
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px 5px";
