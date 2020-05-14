@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.13
+// @version 2.14
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -162,6 +162,9 @@ let SurveyTestHelper = {
   },
   initQuestionInfoDisplay: function () {
     switch (this.questionType) {
+      case QUESTION_TYPE.radio:
+        this.generateRadioInfoDisplay();
+        break;
       case QUESTION_TYPE.array:
         this.generateArrayInfoDisplay();
         break;
@@ -637,7 +640,7 @@ let SurveyTestHelper = {
     let qID = document.querySelector("div.question-container").id.replace("question","");
     for (let i = 0; i < rows.length; i++) {
       let infoDiv = document.createElement("div");
-      infoDiv.innerHTML = rows[i].id.replace(new RegExp("[a-zA-Z]+[0-9]+X[0-9]+X" + qID), "");
+      infoDiv.innerHTML = rows[i].id.replace(new RegExp(".+[0-9]+X[0-9]+X" + qID), "");
       infoDiv.style.position = "absolute";
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px 5px";
@@ -654,7 +657,33 @@ let SurveyTestHelper = {
     }
   },
   generateRadioInfoDisplay: function () {
+    let ansList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
+    let qID = document.querySelector("div.question-container").id.replace("question","");
 
+    for (let i = 0; i < ansList.length; i++) {
+      let infoDiv = document.createElement("div");
+      infoDiv.innerHTML = ansList[i].value;
+      infoDiv.style.position = "absolute";
+      infoDiv.style.top = 0;
+      infoDiv.style.color = "white";
+      infoDiv.style.opacity = 0.75;
+      infoDiv.style.right = "100%";
+      infoDiv.style.height = "28px";
+      infoDiv.style.padding = "3px";
+      infoDiv.style.hyphens = "none";
+      infoDiv.style["min-width"] = "28px";
+      infoDiv.style["text-align"] = "center";
+      infoDiv.style["margin-right"] = "1em";
+      infoDiv.style["background-color"] = "orangered";
+      infoDiv.style["border-radius"] = "30px";
+      infoDiv.style["padding-top"] = "0.2em";
+      infoDiv.style["font-weight"] = "bold";
+      infoDiv.style["transition-duration"] = "0.5s";
+
+      ansList[i].closest("div.answer-item").appendChild(infoDiv);
+
+      this.infoElements.push(infoDiv);
+    }
   }
 };
 
