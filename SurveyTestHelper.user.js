@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.1
+// @version 2.13
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -51,6 +51,9 @@ const STH_COMMANDS = [
   "avoid",
   "force"
 ];
+const STH_ERROR = {
+  hiddenOptionForced: 1
+};
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
 const COMMAND_OBJ_NAME = "STH_commands";
@@ -104,9 +107,9 @@ let SurveyTestHelper = {
     this.activeCheckbox = document.createElement("input");
     this.button = document.createElement("button");
     this.excludeContainer = document.createElement("div");
-    
+
     let chkBoxLabel = document.createElement("label");
-    
+
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
     chkBoxLabel.style["background-color"] = "rgba(255,255,255,0.7)";
     chkBoxLabel.style["border-radius"] = "5px";
@@ -126,7 +129,7 @@ let SurveyTestHelper = {
     this.infoDisplay.style["font-weight"] = "bold";
 
     this.alertDisplay.style["font-weight"] = "bold";
-    this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.5)";
+    this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.75)";
     this.alertDisplay.style["transition-duration"] = "0.75s";
     this.alertDisplay.ontransitionend = function () {
       this.style.color = "#000000";
@@ -140,7 +143,7 @@ let SurveyTestHelper = {
     this.button.style.display = "block";
     this.button.style.width = "100%";
     this.button.innerHTML = "Input and Continue";
-  
+
     this.uiContainer.appendChild(this.infoDisplay);
     this.uiContainer.appendChild(chkBoxLabel);
     this.uiContainer.appendChild(this.button);
@@ -176,7 +179,7 @@ let SurveyTestHelper = {
 
     sessionStorage.setItem("STH_qcode", this.questionCode);
     sessionStorage.setItem("STH_prev_qcode", prevQuestion);
-    
+
     if (activity) {
       this.active = (activity === "1");
     } else {
@@ -188,7 +191,7 @@ let SurveyTestHelper = {
     } else {
       localStorage.setItem(STH_HIDDEN, "0");
     }
-    
+
     if (prevQuestion == this.questionCode) {
       this.attempts = Number(attempts);
     } else {
@@ -199,7 +202,7 @@ let SurveyTestHelper = {
       if (this.commandsFound) {
         let cmdObj = JSON.parse(cmdObjStr);
 
-        // If the current set of commands is missing something 
+        // If the current set of commands is missing something
         // from the stored commands, add them in
         for (const cmd in cmdObj) {
           for (const qCode in cmdObj[cmd]) {
@@ -225,7 +228,7 @@ let SurveyTestHelper = {
   },
   clickNextButton: function () {
     let nextBtn = document.querySelector("#movenextbtn") || document.querySelector("#movesubmitbtn");
-    
+
     if (nextBtn) {
       nextBtn.click();
     } else {
@@ -249,12 +252,14 @@ let SurveyTestHelper = {
   },
   setStorageActivity: function (activity) {
     localStorage.setItem(ACTIVE_NAME, activity ? "1" : "0");
-  },  
+  },
   toggleUI: function () {
     if (this.hidden) {
       this.showUI();
+      this.showInfoElements();
     } else {
       this.hideUI();
+      this.hideInfoElements();
     }
     this.setStorageHidden(this.hidden);
   },
@@ -268,6 +273,12 @@ let SurveyTestHelper = {
   hideUI: function () {
     this.uiContainer.style["margin-right"] = "-" + (marginRightOffset + this.uiContainer.offsetWidth).toString() + "px";
     this.hidden = true;
+  },
+  showInfoElements: function () {
+    this.infoElements.forEach(element => element.style.opacity = 0.75);
+  },
+  hideInfoElements: function () {
+    this.infoElements.forEach(element => element.style.opacity = 0);
   },
   buttonActionHandler: function (e) {
     switch (e.type) {
@@ -334,7 +345,7 @@ let SurveyTestHelper = {
     if (questionText.includes("postal ") || questionText.includes("zip ")) {
       context = Q_CONTEXT.zipCode;
     }
-    if (questionText.includes(" many") 
+    if (questionText.includes(" many")
       || questionText.includes(" much")
       || questionText.includes(" number")
       || questionText.includes("amount")) {
@@ -366,7 +377,7 @@ let SurveyTestHelper = {
     mutationList.forEach(mutation => {
       if (mutation.attributeName === "style" && mutation.target.style.display !== "none") {
         this.setAlert("Answer Invalid." + (this.active ? " Pausing run..." : ""));
-        mutation.target.querySelector("div.modal-footer>a.btn.btn-default").click();
+        mutation.target.querySelector("div.modal-footer > a.btn.btn-default").click();
         if (!this.errorDeactivateOverride) {
           this.setActivity(false);
         }
@@ -408,25 +419,36 @@ let SurveyTestHelper = {
     }
   },
   selectRandomRadio: function () {
-    let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
-    let ansInputList = document.querySelectorAll("div.answers-list>div.answer-item input.radio");
+    let ansList = document.querySelectorAll("div.answers-list > div.answer-item");
+    let ansInputList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
     let r = roll(0, ansInputList.length);
     let forced = false;
 
     this.clearRadio();
 
-    // Checks to see whether the option found is hidden or not
-    while (ansInputList[r].offsetWidth == 0 || ansInputList[r].offsetHeight == 0 ) {
-      r = roll(0, ansInputList.length);
-    }
-    
-    if (this.commands.force && this.commands.force[this.questionCode]) {
-      for (let i = 0; i < ansInputList.length; i++) {
-        if (this.commands.force[this.questionCode][0] == ansInputList[i].value) {
-          r = i;
-          forced = true;
+    try {
+      if (this.commands.force && this.commands.force[this.questionCode]) {
+        let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
+        for (let i = 0; i < ansInputList.length; i++) {
+          if (forcedVal === ansInputList[i].value) {
+            r = i;
+            if (isHidden(ansInputList[r])) {
+              throw "ERROR: " + this.questionCode + " - option " + forcedVal +
+                " is hidden but is being used as a forced option.";
+            }
+            break;
+          }
+        }
+        forced = true;
+      } else {
+        // Checks to see whether the option found is hidden or not
+        while (isHidden(ansInputList[r])) {
+          r = roll(0, ansInputList.length);
         }
       }
+    }
+    catch (e) {
+      this.setAlert(e);
     }
     if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
       let restrictedVals = this.commands.avoid[this.questionCode];
@@ -472,7 +494,7 @@ let SurveyTestHelper = {
         if (otherOpt) {
           otherOpt.value = "";
         }
-        break; 
+        break;
       }
     }
   },
@@ -526,7 +548,7 @@ let SurveyTestHelper = {
     let numToCheck = roll(1, Math.ceil(checkboxes.length / 2));
     let toBeChecked = [];
     let r = 0;
-    
+
     // Clear the checkboxes before re-selecting them
     this.clearMChoice();
 
@@ -554,16 +576,33 @@ let SurveyTestHelper = {
     });
   },
   selectRandomDropdown: function () {
-    let dropdownElement = document.querySelector("div.question-container select.list-question-select");
-    let r = roll(0, dropdownElement.length - 1);
-    let option = dropdownElement[r];
+    let dropdownElements = document.querySelector("div.question-container select.list-question-select");
+    let r = roll(0, dropdownElements.length);
+    let forced = false;
 
-    while (!option.value) {
-      r = roll(0, dropdownElement.length - 1);
-      option = dropdownElement[r];
+    if (this.commands.force && this.commands.force[this.questionCode]) {
+      let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
+      for (let i = 0; i < dropdownElements.length; i++) {
+        if (forcedVal === dropdownElements[i].value) {
+          r = i;
+          break;
+        }
+      }
+      forced = true;
+    } else {
+      // Roll until we reach an option with a value
+      while (!dropdownElements[r].value) {
+        r = roll(0, dropdownElements.length);
+      }
+    }
+    if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
+      let restrictedVals = this.commands.avoid[this.questionCode];
+      while (!dropdownElements[r].value || restrictedVals.includes(dropdownElements[r].value)) {
+        r = roll(0, dropdownElements.length);
+      }
     }
 
-    option.selected = true;
+    dropdownElements[r].selected = true;
   },
   queryCommands: function () {
     // commands are html tags with data attributes of the same name containing
@@ -573,16 +612,16 @@ let SurveyTestHelper = {
     for (let x = 0; x < STH_COMMANDS.length; x++) {
       commandContainer[STH_COMMANDS[x]] = null;
     }
-    
+
     if (commandList.length > 0) {
       commandList.forEach(cmd => {
         let tempCmd = {};
         let questionData = cmd.dataset[cmd.localName].split("|");
-        
+
         for (let i = 0; i < questionData.length; i++) {
           let arrTemp = questionData[i].split(" ").join("").split(",");
           let qName = arrTemp.shift();
-          
+
           tempCmd[qName] = arrTemp;
         }
 
@@ -594,7 +633,7 @@ let SurveyTestHelper = {
     return commandContainer;
   },
   generateArrayInfoDisplay: function () {
-    let rows = document.querySelectorAll("tbody > tr");
+    let rows = document.querySelectorAll("tbody > tr.answers-list");
     let qID = document.querySelector("div.question-container").id.replace("question","");
     for (let i = 0; i < rows.length; i++) {
       let infoDiv = document.createElement("div");
@@ -607,11 +646,15 @@ let SurveyTestHelper = {
       infoDiv.style["background-color"] = "orangered";
       infoDiv.style["border-radius"] = "50% 0 0 10%";
       infoDiv.style["font-weight"] = "bold";
+      infoDiv.style["transition-duration"] = "0.5s";
 
       rows[i].appendChild(infoDiv);
 
       this.infoElements.push(infoDiv);
     }
+  },
+  generateRadioInfoDisplay: function () {
+
   }
 };
 
@@ -635,6 +678,10 @@ function getDateString () {
     String(curDate.getDate()).padStart(2, "0") + " " +
     String(curDate.getHours()).padStart(2,"0") + ":" +
     String(curDate.getMinutes()).padStart(2,"0");
+}
+
+function isHidden(element) {
+  return (element.offsetWidth == 0 || element.offsetHeight == 0 );
 }
 
 var marginRightOffset = 15;
