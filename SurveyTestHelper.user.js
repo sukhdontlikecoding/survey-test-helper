@@ -75,6 +75,7 @@ let SurveyTestHelper = {
   errorAlertShown: false,
   initialize: function () {
     console.log("Initializing...");
+
     this.addErrorAlertListener();
     this.questionCode = document.querySelector("span#QNameNumData");
     this.questionCode = this.questionCode ? this.questionCode.dataset.code : "N/A";
@@ -92,13 +93,10 @@ let SurveyTestHelper = {
 
     document.body.appendChild(this.uiContainer);
 
-    // Delay the auto-run so that LS has a chance to properly manage its UI before we start
-    window.setTimeout(function () {
-      if (this.active) {
-        this.enterDummyResponse();
-        this.clickNextButton();
-      }
-    }.bind(this), 10);
+    if (this.active) {
+      this.enterDummyResponse();
+      this.clickNextButton();
+    }
   },
   initUI: function () {
     this.uiContainer = document.createElement("div");
@@ -342,7 +340,7 @@ let SurveyTestHelper = {
     let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
     let context = null;
 
-    if (questionText.includes("age") || questionText.includes("how old")) {
+    if (questionText.includes(" age") || questionText.includes("how old")) {
       context = Q_CONTEXT.age;
     }
     if (questionText.includes("postal ") || questionText.includes("zip ")) {
@@ -354,7 +352,7 @@ let SurveyTestHelper = {
       || questionText.includes("amount")) {
       context = Q_CONTEXT.quantity;
     }
-    if (questionText.includes("year") || questionText.includes(" born") ) {
+    if (questionText.includes("year ") || questionText.includes(" born") ) {
       if (questionText.includes("9999")) {
         context = Q_CONTEXT.yearRef;
       } else if (questionText.includes("0000")) {
@@ -637,13 +635,17 @@ let SurveyTestHelper = {
   },
   generateArrayInfoDisplay: function () {
     let rows = document.querySelectorAll("tbody > tr.answers-list");
+    let headerCols = document.querySelectorAll("thead th.th-9");
+    let firstRowCells = rows[0].querySelectorAll("td.answer-item>input");
     let qID = document.querySelector("div.question-container").id.replace("question","");
+
+    // Subquestion code display
     for (let i = 0; i < rows.length; i++) {
       let infoDiv = document.createElement("div");
       infoDiv.innerHTML = rows[i].id.replace(new RegExp(".+[0-9]+X[0-9]+X" + qID), "");
       infoDiv.style.position = "absolute";
       infoDiv.style.right = "100%";
-      infoDiv.style.padding = "3px 5px";
+      infoDiv.style.padding = "3px 0.5em";
       infoDiv.style.color = "white";
       infoDiv.style.opacity = 0.75;
       infoDiv.style["background-color"] = "orangered";
@@ -655,22 +657,49 @@ let SurveyTestHelper = {
 
       this.infoElements.push(infoDiv);
     }
+
+    // Answer option value display
+    for (let j = 0; j < firstRowCells.length; j++) {
+      let infoDiv = document.createElement("div");
+      infoDiv.innerHTML = firstRowCells[j].value;
+      infoDiv.style.position = "absolute";
+      infoDiv.style.bottom = "100%";
+      infoDiv.style.left = "50%";
+      infoDiv.style.padding = "3px 0.5em";
+      infoDiv.style.color = "white";
+      infoDiv.style.opacity = 0.75;
+      infoDiv.style["transform"] = "translate(-50%, -100%)";
+      infoDiv.style["background-color"] = "orangered";
+      infoDiv.style["border-radius"] = "45% 45% 0 0";
+      infoDiv.style["font-weight"] = "bold";
+      infoDiv.style["transition-duration"] = "0.5s";
+
+      let infoDivContainer = document.createElement("div");
+      infoDivContainer.style.position = "relative";
+
+      infoDivContainer.appendChild(infoDiv);
+      headerCols[j].appendChild(infoDivContainer);
+
+      this.infoElements.push(infoDiv);
+    }
   },
   generateRadioInfoDisplay: function () {
     let ansList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
     let qID = document.querySelector("div.question-container").id.replace("question","");
 
+    // Answer option value display
     for (let i = 0; i < ansList.length; i++) {
       let infoDiv = document.createElement("div");
       infoDiv.innerHTML = ansList[i].value;
       infoDiv.style.position = "absolute";
-      infoDiv.style.top = 0;
+      infoDiv.style.top = "-0.3em";
       infoDiv.style.color = "white";
       infoDiv.style.opacity = 0.75;
       infoDiv.style.right = "100%";
-      infoDiv.style.height = "28px";
       infoDiv.style.padding = "3px";
       infoDiv.style.hyphens = "none";
+      infoDiv.style.height = "28px";
+      infoDiv.style.width = "fit-content";
       infoDiv.style["min-width"] = "28px";
       infoDiv.style["text-align"] = "center";
       infoDiv.style["margin-right"] = "1em";
@@ -715,4 +744,7 @@ function isHidden(element) {
 
 var marginRightOffset = 15;
 
-SurveyTestHelper.initialize();
+// Delay initialization so that LS has a chance to properly manage its UI before we start
+window.setTimeout(function () {
+  SurveyTestHelper.initialize();
+}, 10);
