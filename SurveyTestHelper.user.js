@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.14
+// @version 2.15
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -378,7 +378,9 @@ let SurveyTestHelper = {
     mutationList.forEach(mutation => {
       if (mutation.attributeName === "style" && mutation.target.style.display !== "none") {
         this.setAlert("Answer Invalid." + (this.active ? " Pausing run..." : ""));
-        mutation.target.querySelector("div.modal-footer > a.btn.btn-default").click();
+        if (!this.hidden) {
+          mutation.target.querySelector("div.modal-footer > a.btn.btn-default").click();
+        }
         if (!this.errorDeactivateOverride) {
           this.setActivity(false);
         }
@@ -480,7 +482,7 @@ let SurveyTestHelper = {
           otherOpt.value = roll(0, 100);
           break;
         default:  // Generic string response
-          otherOpt.value = "Run at: " + getDateString();
+          otherOpt.value = "Run at: " + getTimeStamp();
       }
     }
   },
@@ -532,7 +534,7 @@ let SurveyTestHelper = {
   enterSFTValue: function () {
     let inputElement = document.querySelector("div.question-container input.text");
 
-    inputElement.value = "Run at: " + getDateString();
+    inputElement.value = "Run at: " + getTimeStamp();
   },
   selectArrayOptions: function () {
     let arrayTable = document.querySelector("table.questions-list");
@@ -558,7 +560,7 @@ let SurveyTestHelper = {
       if (!checkboxes[r].checked && checkboxes[r].closest("div.answer-item").style.display != "none") {
         checkboxes[r].checked = true;
         if (checkboxes[r].classList.contains("other-checkbox")) {
-          checkboxes[r].closest("div.answer-item").querySelector("input.text").value = "Dummy Data";
+          checkboxes[r].closest("div.answer-item").querySelector("input.text").value = getTimeStamp();
         }
         toBeChecked.push(r);
       }
@@ -658,19 +660,20 @@ let SurveyTestHelper = {
       this.infoElements.push(infoDiv);
     }
 
+    let rowHeight = headerCols[0].offsetHeight.toString() + "px";
     // Answer option value display
     for (let j = 0; j < firstRowCells.length; j++) {
       let infoDiv = document.createElement("div");
       infoDiv.innerHTML = firstRowCells[j].value;
       infoDiv.style.position = "absolute";
-      infoDiv.style.bottom = "100%";
+      infoDiv.style.top = "-" + rowHeight;
       infoDiv.style.left = "50%";
       infoDiv.style.padding = "3px 0.5em";
       infoDiv.style.color = "white";
       infoDiv.style.opacity = 0.75;
       infoDiv.style["transform"] = "translate(-50%, -100%)";
       infoDiv.style["background-color"] = "orangered";
-      infoDiv.style["border-radius"] = "45% 45% 0 0";
+      infoDiv.style["border-radius"] = "45% 45% 5px 5px";
       infoDiv.style["font-weight"] = "bold";
       infoDiv.style["transition-duration"] = "0.5s";
 
@@ -731,7 +734,7 @@ function generateNumericInput (min, max, refusedVal=-1) {
   return returnVal;
 };
 
-function getDateString () {
+function getTimeStamp () {
   return String(curDate.getMonth() + 1).padStart(2, "0") + "-" +
     String(curDate.getDate()).padStart(2, "0") + " " +
     String(curDate.getHours()).padStart(2,"0") + ":" +
