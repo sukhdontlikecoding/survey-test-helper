@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.15
+// @version 2.16
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -85,7 +85,6 @@ let SurveyTestHelper = {
 
     this.initStorage();
     this.initUI();
-    this.initQuestionInfoDisplay();
 
     // Attach handlers
     this.button.onclick = this.buttonActionHandler.bind(this);
@@ -100,11 +99,10 @@ let SurveyTestHelper = {
   },
   initUI: function () {
     this.uiContainer = document.createElement("div");
-    this.infoDisplay = document.createElement("div");
+    this.qCodeDisplay = document.createElement("div");
     this.alertDisplay = document.createElement("div");
     this.activeCheckbox = document.createElement("input");
     this.button = document.createElement("button");
-    this.excludeContainer = document.createElement("div");
 
     let chkBoxLabel = document.createElement("label");
 
@@ -116,15 +114,6 @@ let SurveyTestHelper = {
     chkBoxLabel.style.cursor = "pointer";
     chkBoxLabel.style.display = "block";
     chkBoxLabel.appendChild(this.activeCheckbox);
-
-    this.infoDisplay.innerHTML = this.questionCode;
-    this.infoDisplay.style.height = "40px";
-    this.infoDisplay.style.display = "inline-block";
-    this.infoDisplay.style.color = "floralwhite";
-    this.infoDisplay.style.padding = "10px";
-    this.infoDisplay.style["background-color"] = "orange";
-    this.infoDisplay.style["border-radius"] = "20px";
-    this.infoDisplay.style["font-weight"] = "bold";
 
     this.alertDisplay.style["font-weight"] = "bold";
     this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.75)";
@@ -141,11 +130,12 @@ let SurveyTestHelper = {
     this.button.style.display = "block";
     this.button.style.width = "100%";
     this.button.innerHTML = "Input and Continue";
-
-    this.uiContainer.appendChild(this.infoDisplay);
+    
     this.uiContainer.appendChild(chkBoxLabel);
     this.uiContainer.appendChild(this.button);
     this.uiContainer.appendChild(this.alertDisplay);
+
+    this.initQuestionInfoDisplay();
 
     this.uiContainer.style.position = "fixed";
     this.uiContainer.style.padding = "7px";
@@ -169,6 +159,32 @@ let SurveyTestHelper = {
       default:
         console.log("Question type for info display not found.");
     }
+
+    this.qCodeDisplay.innerHTML = this.questionCode;
+    this.qCodeDisplay.style.height = "40px";
+    this.qCodeDisplay.style.display = "inline-block";
+    this.qCodeDisplay.style.color = "floralwhite";
+    this.qCodeDisplay.style.position = "absolute";
+    this.qCodeDisplay.style.top = "-20px";
+    this.qCodeDisplay.style.opacity = this.hidden ? 0 : 0.95;
+    this.qCodeDisplay.style.padding = "10px";
+    this.qCodeDisplay.style["background-color"] = "orange";
+    this.qCodeDisplay.style["border-radius"] = "20px";
+    this.qCodeDisplay.style["font-weight"] = "bold";
+    
+    this.qCodeDisplay.dataset.opacity = 0.95;
+
+    this.infoElements.push(this.qCodeDisplay);
+
+    // Set the generic style settings for each infoDisplay element
+    this.infoElements.forEach(e => {
+      e.style.color = "white";
+      e.style["background-color"] = "orangered";
+      e.style["font-weight"] = "bold";
+      e.style["transition-duration"] = "0.5s";
+    });
+
+    document.querySelector("div.question-container").appendChild(this.qCodeDisplay);
   },
   initStorage: function () {
     let activity = localStorage.getItem(ACTIVE_NAME);
@@ -276,7 +292,7 @@ let SurveyTestHelper = {
     this.hidden = true;
   },
   showInfoElements: function () {
-    this.infoElements.forEach(element => element.style.opacity = 0.75);
+    this.infoElements.forEach(element => element.style.opacity = element.dataset.opacity);
   },
   hideInfoElements: function () {
     this.infoElements.forEach(element => element.style.opacity = 0);
@@ -669,13 +685,11 @@ let SurveyTestHelper = {
       infoDiv.style.top = "-" + rowHeight;
       infoDiv.style.left = "50%";
       infoDiv.style.padding = "3px 0.5em";
-      infoDiv.style.color = "white";
       infoDiv.style.opacity = this.hidden ? 0 : 0.75;
       infoDiv.style["transform"] = "translate(-50%, -100%)";
-      infoDiv.style["background-color"] = "orangered";
       infoDiv.style["border-radius"] = "45% 45% 5px 5px";
-      infoDiv.style["font-weight"] = "bold";
-      infoDiv.style["transition-duration"] = "0.5s";
+
+      infoDiv.dataset.opacity = 0.75;
 
       let infoDivContainer = document.createElement("div");
       infoDivContainer.style.position = "relative";
@@ -688,7 +702,6 @@ let SurveyTestHelper = {
   },
   generateRadioInfoDisplay: function () {
     let ansList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
-    let qID = document.querySelector("div.question-container").id.replace("question","");
 
     // Answer option value display
     for (let i = 0; i < ansList.length; i++) {
@@ -696,7 +709,6 @@ let SurveyTestHelper = {
       infoDiv.innerHTML = ansList[i].value;
       infoDiv.style.position = "absolute";
       infoDiv.style.top = "-0.3em";
-      infoDiv.style.color = "white";
       infoDiv.style.opacity = this.hidden ? 0 : 0.75;
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px";
@@ -706,11 +718,10 @@ let SurveyTestHelper = {
       infoDiv.style["min-width"] = "28px";
       infoDiv.style["text-align"] = "center";
       infoDiv.style["margin-right"] = "1em";
-      infoDiv.style["background-color"] = "orangered";
       infoDiv.style["border-radius"] = "30px";
       infoDiv.style["padding-top"] = "0.2em";
-      infoDiv.style["font-weight"] = "bold";
-      infoDiv.style["transition-duration"] = "0.5s";
+
+      infoDiv.dataset.opacity = 0.75;
 
       ansList[i].closest("div.answer-item").appendChild(infoDiv);
 
