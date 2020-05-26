@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.16
+// @version 2.17
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -156,6 +156,9 @@ let SurveyTestHelper = {
       case QUESTION_TYPE.array:
         this.generateArrayInfoDisplay();
         break;
+      case QUESTION_TYPE.mChoice:
+        this.generateMChoiceInfoDisplay();
+        break;
       default:
         console.log("Question type for info display not found.");
     }
@@ -176,7 +179,7 @@ let SurveyTestHelper = {
 
     this.infoElements.push(this.qCodeDisplay);
 
-    // Set the generic style settings for each infoDisplay element
+    // Set generic style settings for each infoDisplay element
     this.infoElements.forEach(e => {
       e.style.color = "white";
       e.style["background-color"] = "orangered";
@@ -654,13 +657,13 @@ let SurveyTestHelper = {
   generateArrayInfoDisplay: function () {
     let rows = document.querySelectorAll("tbody > tr.answers-list");
     let headerCols = document.querySelectorAll("thead th.th-9");
-    let firstRowCells = rows[0].querySelectorAll("td.answer-item>input");
+    let firstRowCells = rows[0].querySelectorAll("td.answer-item > input");
     let qID = document.querySelector("div.question-container").id.replace("question","");
 
     // Subquestion code display
     for (let i = 0; i < rows.length; i++) {
       let infoDiv = document.createElement("div");
-      infoDiv.innerHTML = rows[i].id.replace(new RegExp(".+[0-9]+X[0-9]+X" + qID), "");
+      infoDiv.innerHTML = rows[i].id.split(qID)[1];
       infoDiv.style.position = "absolute";
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px 0.5em";
@@ -724,6 +727,34 @@ let SurveyTestHelper = {
       infoDiv.dataset.opacity = 0.75;
 
       ansList[i].closest("div.answer-item").appendChild(infoDiv);
+
+      this.infoElements.push(infoDiv);
+    }
+  },
+  generateMChoiceInfoDisplay: function () {
+    let choiceList = document.querySelectorAll("div.questions-list > div > div.answer-item");
+    let qID = document.querySelector("div.question-container").id.replace("question","");
+
+    for (let i = 0; i < choiceList.length; i++) {
+      let infoDiv = document.createElement("div");
+      infoDiv.innerHTML = choiceList[i].id.split(qID)[1];
+      infoDiv.style.position = "absolute";
+      infoDiv.style.top = "-0.3em";
+      infoDiv.style.opacity = this.hidden ? 0 : 0.75;
+      infoDiv.style.right = "100%";
+      infoDiv.style.padding = "3px";
+      infoDiv.style.hyphens = "none";
+      infoDiv.style.height = "28px";
+      infoDiv.style.width = "fit-content";
+      infoDiv.style["min-width"] = "28px";
+      infoDiv.style["text-align"] = "center";
+      infoDiv.style["margin-right"] = "-0.5em";
+      infoDiv.style["border-radius"] = "30px";
+      infoDiv.style["padding-top"] = "0.2em";
+
+      infoDiv.dataset.opacity = 0.75;
+
+      choiceList[i].appendChild(infoDiv);
 
       this.infoElements.push(infoDiv);
     }
