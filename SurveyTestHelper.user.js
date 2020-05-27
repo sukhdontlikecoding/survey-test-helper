@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.17
+// @version 2.18
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -37,7 +37,7 @@ const BUTTON_CODES = {
   esc: 27,
   insert: 45
 };
-const Q_CONTEXT = {
+const Q_NUM_CONTEXT = {
   age: 1,
   year: 2,
   zipCode: 3,
@@ -47,6 +47,12 @@ const Q_CONTEXT = {
   yearAL: 7,
   scale: 8
 };
+const Q_MC_CONTEXT = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5
+}
 const STH_COMMANDS = [
   "avoid",
   "force"
@@ -99,7 +105,6 @@ let SurveyTestHelper = {
   },
   initUI: function () {
     this.uiContainer = document.createElement("div");
-    this.qCodeDisplay = document.createElement("div");
     this.alertDisplay = document.createElement("div");
     this.activeCheckbox = document.createElement("input");
     this.button = document.createElement("button");
@@ -149,6 +154,9 @@ let SurveyTestHelper = {
     this.uiContainer.style["text-align"] = "center";
   },
   initQuestionInfoDisplay: function () {
+    let qCodeDisplay = document.createElement("div");
+    let qContainer = document.querySelector("div.question-container");
+
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
         this.generateRadioInfoDisplay();
@@ -163,21 +171,28 @@ let SurveyTestHelper = {
         console.log("Question type for info display not found.");
     }
 
-    this.qCodeDisplay.innerHTML = this.questionCode;
-    this.qCodeDisplay.style.height = "40px";
-    this.qCodeDisplay.style.display = "inline-block";
-    this.qCodeDisplay.style.color = "floralwhite";
-    this.qCodeDisplay.style.position = "absolute";
-    this.qCodeDisplay.style.top = "-20px";
-    this.qCodeDisplay.style.opacity = this.hidden ? 0 : 0.95;
-    this.qCodeDisplay.style.padding = "10px";
-    this.qCodeDisplay.style["background-color"] = "orange";
-    this.qCodeDisplay.style["border-radius"] = "20px";
-    this.qCodeDisplay.style["font-weight"] = "bold";
+    qCodeDisplay.innerHTML = this.questionCode;
+    qCodeDisplay.style.height = "40px";
+    qCodeDisplay.style.display = "inline-block";
+    qCodeDisplay.style.color = "floralwhite";
+    qCodeDisplay.style.position = "absolute";
+    qCodeDisplay.style.top = "-20px";
+    qCodeDisplay.style.opacity = this.hidden ? 0 : 0.95;
+    qCodeDisplay.style.padding = "10px";
+    qCodeDisplay.style["background-color"] = "orange";
+    qCodeDisplay.style["border-radius"] = "20px";
+    qCodeDisplay.style["font-weight"] = "bold";
     
-    this.qCodeDisplay.dataset.opacity = 0.95;
+    qCodeDisplay.dataset.opacity = 0.95;
 
-    this.infoElements.push(this.qCodeDisplay);
+    if (qContainer) {
+      qContainer.appendChild(qCodeDisplay);
+      this.infoElements.push(qCodeDisplay);
+    } else {
+      this.uiContainer.prepend(qCodeDisplay);
+      qCodeDisplay.style.position = "relative";
+      qCodeDisplay.style.top = "0px";
+    }
 
     // Set generic style settings for each infoDisplay element
     this.infoElements.forEach(e => {
@@ -186,8 +201,6 @@ let SurveyTestHelper = {
       e.style["font-weight"] = "bold";
       e.style["transition-duration"] = "0.5s";
     });
-
-    document.querySelector("div.question-container").appendChild(this.qCodeDisplay);
   },
   initStorage: function () {
     let activity = localStorage.getItem(ACTIVE_NAME);
@@ -354,34 +367,55 @@ let SurveyTestHelper = {
     }
     return undefined;
   },
-  getQuestionContext: function () {
+  getNumericContext: function () {
     // Return a context enumeration based on what the question text contains
     let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
     let context = null;
 
     if (questionText.includes(" age") || questionText.includes("how old")) {
-      context = Q_CONTEXT.age;
+      context = Q_NUM_CONTEXT.age;
     }
     if (questionText.includes("postal ") || questionText.includes("zip ")) {
-      context = Q_CONTEXT.zipCode;
+      context = Q_NUM_CONTEXT.zipCode;
     }
     if (questionText.includes(" many")
       || questionText.includes(" much")
       || questionText.includes(" number")
       || questionText.includes("amount")) {
-      context = Q_CONTEXT.quantity;
+      context = Q_NUM_CONTEXT.quantity;
     }
     if (questionText.includes("year ") || questionText.includes(" born") ) {
       if (questionText.includes("9999")) {
-        context = Q_CONTEXT.yearRef;
+        context = Q_NUM_CONTEXT.yearRef;
       } else if (questionText.includes("0000")) {
-        context = Q_CONTEXT.yearAL;
+        context = Q_NUM_CONTEXT.yearAL;
       } else {
-        context = Q_CONTEXT.year;
+        context = Q_NUM_CONTEXT.year;
       }
     }
     if (questionText.includes("a scale")) {
-      context = Q_CONTEXT.scale;
+      context = Q_NUM_CONTEXT.scale;
+    }
+    return context;
+  },
+  getMCContext: function () {
+    // Return a context enumeration based on what the question text contains
+    let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
+    let context = null;
+
+    if (questionText.includes("choos")
+      || questionText.includes("select")
+      || questionText.includes("pick")
+      || questionText.includes(" up to ")) {
+      if (questionText.includes(" two") || questionText.includes(" 2")) {
+        context = Q_MC_CONTEXT.two;
+      } else if (questionText.includes(" three") || questionText.includes(" 3")) {
+        context = Q_MC_CONTEXT.three;
+      } else if (questionText.includes(" four") || questionText.includes(" 4")) {
+        context = Q_MC_CONTEXT.four;
+      } else if (questionText.includes(" five") || questionText.includes(" 5")) {
+        context = Q_MC_CONTEXT.five;
+      }
     }
     return context;
   },
@@ -482,22 +516,22 @@ let SurveyTestHelper = {
     ansList.item(r).querySelector("input.radio").checked = true;
     let otherOpt = ansList.item(r).querySelector("input.text");
     if (otherOpt) {
-      let context = this.getQuestionContext();
+      let context = this.getNumericContext();
       switch (context) {
-        case Q_CONTEXT.age:
-        case Q_CONTEXT.percent:
+        case Q_NUM_CONTEXT.age:
+        case Q_NUM_CONTEXT.percent:
           otherOpt.value = roll(18, 100);
           break;
-        case Q_CONTEXT.year:
+        case Q_NUM_CONTEXT.year:
           otherOpt.value = roll(1910, validAgeYear);
           break;
-        case Q_CONTEXT.zipCode:
+        case Q_NUM_CONTEXT.zipCode:
           otherOpt.value = "90210";
           break;
-        case Q_CONTEXT.quantity:
+        case Q_NUM_CONTEXT.quantity:
           otherOpt.value = roll(0, 20);
           break;
-        case Q_CONTEXT.scale:
+        case Q_NUM_CONTEXT.scale:
           otherOpt.value = roll(0, 100);
           break;
         default:  // Generic string response
@@ -523,24 +557,24 @@ let SurveyTestHelper = {
   enterNumericValue: function () {
     let inputVal = 0;
     let inputElement = document.querySelector("div.question-container input.numeric");
-    let context = this.getQuestionContext();
+    let context = this.getNumericContext();
 
     switch (context) {
-      case Q_CONTEXT.age:
-      case Q_CONTEXT.percent:
+      case Q_NUM_CONTEXT.age:
+      case Q_NUM_CONTEXT.percent:
         inputVal = generateNumericInput(18, 100);
         break;
-      case Q_CONTEXT.year:
+      case Q_NUM_CONTEXT.year:
         inputVal = generateNumericInput(1910, validAgeYear);
         break;
-      case Q_CONTEXT.zipCode:
+      case Q_NUM_CONTEXT.zipCode:
         inputVal = 90210;
         break;
-      case Q_CONTEXT.yearRef:
+      case Q_NUM_CONTEXT.yearRef:
         // Year except with a refused option
         inputVal = generateNumericInput(1910, validAgeYear, 9999);
         break;
-      case Q_CONTEXT.yearAL:
+      case Q_NUM_CONTEXT.yearAL:
         // Client-specific year w/ refused option
         inputVal = generateNumericInput(1910, validAgeYear, 0);
         break;
@@ -567,21 +601,64 @@ let SurveyTestHelper = {
   },
   selectMultipleChoiceOptions: function () {
     let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
-    let numToCheck = roll(1, Math.ceil(checkboxes.length / 2));
+    let context = this.getMCContext();
+    let numToCheck = roll(1, context ? context + 1 : Math.ceil(checkboxes.length / 2));
     let toBeChecked = [];
     let r = 0;
+    let forced = false;
+    let restrictedVals = [];
+    let rollAttempts = 0;
+
+    let qID = document.querySelector("div.question-container").id.replace("question","");
+    let subquestionCodes = function () {
+      sqCodes = [];
+
+      document.querySelectorAll("div.questions-list > div > div.answer-item").forEach(function (e) {
+        sqCodes.push(e.id.split(qID)[1]);
+      });
+      return sqCodes;
+    }();
 
     // Clear the checkboxes before re-selecting them
     this.clearMChoice();
 
-    while (toBeChecked.length < numToCheck) {
+    try {
+      if (this.commands.force && this.commands.force[this.questionCode]) {
+        let forcedVals = this.commands.force[this.questionCode];
+        for (let i = 0; i < subquestionCodes.length 
+          && toBeChecked.length < numToCheck
+          && toBeChecked.length < forcedVals.length; i++) {
+          if (forcedVals.includes(subquestionCodes[i])) {
+            checkboxes[i].checked = true;
+            if (isHidden(checkboxes[i])) {
+              throw "ERROR: " + this.questionCode + " - option " + subquestionCodes[i] +
+                " is hidden but is being used as a forced option.";
+            }
+            toBeChecked.push(i);
+          }
+        }
+        forced = true;
+      }
+    }
+    catch (e) {
+      this.setAlert(e);
+    }
+    if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
+      restrictedVals = this.commands.avoid[this.questionCode];
+    }
+
+    while (rollAttempts < 10 && toBeChecked.length < numToCheck) {
       r = roll(0, checkboxes.length);
-      if (!checkboxes[r].checked && checkboxes[r].closest("div.answer-item").style.display != "none") {
+      if (!checkboxes[r].checked
+        && checkboxes[r].closest("div.answer-item").style.display != "none"
+        && !restrictedVals.includes(subquestionCodes[r])) {
         checkboxes[r].checked = true;
         if (checkboxes[r].classList.contains("other-checkbox")) {
           checkboxes[r].closest("div.answer-item").querySelector("input.text").value = getTimeStamp();
         }
         toBeChecked.push(r);
+      } else {
+        rollAttempts++;
       }
     }
   },
