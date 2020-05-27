@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.18
+// @version 2.19
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -557,29 +557,40 @@ let SurveyTestHelper = {
   enterNumericValue: function () {
     let inputVal = 0;
     let inputElement = document.querySelector("div.question-container input.numeric");
-    let context = this.getNumericContext();
 
-    switch (context) {
-      case Q_NUM_CONTEXT.age:
-      case Q_NUM_CONTEXT.percent:
-        inputVal = generateNumericInput(18, 100);
-        break;
-      case Q_NUM_CONTEXT.year:
-        inputVal = generateNumericInput(1910, validAgeYear);
-        break;
-      case Q_NUM_CONTEXT.zipCode:
-        inputVal = 90210;
-        break;
-      case Q_NUM_CONTEXT.yearRef:
-        // Year except with a refused option
-        inputVal = generateNumericInput(1910, validAgeYear, 9999);
-        break;
-      case Q_NUM_CONTEXT.yearAL:
-        // Client-specific year w/ refused option
-        inputVal = generateNumericInput(1910, validAgeYear, 0);
-        break;
-      default:  // Probably a quantity or something
-        inputVal = roll(0, 20);
+    if (this.commands.force && this.commands.force[this.questionCode]) {
+      // Select from one of the comma separated values, if it's a range it should have a '-' in it
+      let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)].split("-");
+      if (forcedVal.length > 1) {
+        forcedVal = roll(Number(forcedVal[0]), Number(forcedVal[1]) + 1);
+        inputVal = forcedVal;
+      } else {
+        inputVal = forcedVal[0];
+      }
+    } else {
+      let context = this.getNumericContext();
+      switch (context) {
+        case Q_NUM_CONTEXT.age:
+        case Q_NUM_CONTEXT.percent:
+          inputVal = generateNumericInput(18, 100);
+          break;
+        case Q_NUM_CONTEXT.year:
+          inputVal = generateNumericInput(1910, validAgeYear);
+          break;
+        case Q_NUM_CONTEXT.zipCode:
+          inputVal = 90210;
+          break;
+        case Q_NUM_CONTEXT.yearRef:
+          // Year except with a refused option
+          inputVal = generateNumericInput(1910, validAgeYear, 9999);
+          break;
+        case Q_NUM_CONTEXT.yearAL:
+          // Client-specific year w/ refused option
+          inputVal = generateNumericInput(1910, validAgeYear, 0);
+          break;
+        default:  // Probably a quantity or something
+          inputVal = roll(0, 20);
+      }
     }
 
     inputElement.value = inputVal;
@@ -628,6 +639,7 @@ let SurveyTestHelper = {
         for (let i = 0; i < subquestionCodes.length 
           && toBeChecked.length < numToCheck
           && toBeChecked.length < forcedVals.length; i++) {
+          // Check every option that is forced
           if (forcedVals.includes(subquestionCodes[i])) {
             checkboxes[i].checked = true;
             if (isHidden(checkboxes[i])) {
@@ -647,7 +659,7 @@ let SurveyTestHelper = {
       restrictedVals = this.commands.avoid[this.questionCode];
     }
 
-    while (rollAttempts < 10 && toBeChecked.length < numToCheck) {
+    while (rollAttempts <= 10 && toBeChecked.length < numToCheck) {
       r = roll(0, checkboxes.length);
       if (!checkboxes[r].checked
         && checkboxes[r].closest("div.answer-item").style.display != "none"
@@ -658,6 +670,7 @@ let SurveyTestHelper = {
         }
         toBeChecked.push(r);
       } else {
+        // Infinite loop avoidance
         rollAttempts++;
       }
     }
