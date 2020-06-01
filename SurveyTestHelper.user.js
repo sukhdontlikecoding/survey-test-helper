@@ -666,7 +666,7 @@ let SurveyTestHelper = {
         && !restrictedVals.includes(subquestionCodes[r])) {
         checkboxes[r].checked = true;
         if (checkboxes[r].classList.contains("other-checkbox")) {
-          checkboxes[r].closest("div.answer-item").querySelector("input.text").value = getTimeStamp();
+          checkboxes[r].closest("div.answer-item").querySelector("input.text").value = "Run at: " + getTimeStamp();
         }
         toBeChecked.push(r);
       } else {
