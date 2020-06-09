@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.19
+// @version 2.19.1
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -375,6 +375,9 @@ let SurveyTestHelper = {
     let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
     let context = null;
 
+    if (questionText.includes("percent")) {
+      context = Q_NUM_CONTEXT.percent;
+    }
     if (questionText.includes(" age") || questionText.includes("how old")) {
       context = Q_NUM_CONTEXT.age;
     }
