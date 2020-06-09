@@ -239,7 +239,10 @@ let SurveyTestHelper = {
         // from the stored commands, add them in
         for (const cmd in cmdObj) {
           for (const qCode in cmdObj[cmd]) {
-            if (qCode && !this.commands[cmd][qCode]) {
+            if (!this.commands[cmd]) {
+              this.commands[cmd] = {};
+            }
+            if (!this.commands[cmd][qCode]) {
               this.commands[cmd][qCode] = cmdObj[cmd][qCode];
             }
           }
