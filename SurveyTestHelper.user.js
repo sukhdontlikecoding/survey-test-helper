@@ -770,6 +770,8 @@ let SurveyTestHelper = {
       infoDiv.style["font-weight"] = "bold";
       infoDiv.style["transition-duration"] = "0.5s";
 
+      infoDiv.dataset.opacity = 0.75;
+
       rows[i].appendChild(infoDiv);
 
       this.infoElements.push(infoDiv);
