@@ -4,8 +4,8 @@
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
-// @include /^https?:\/\/.+\.(com|net)\/index\.php(\/survey\/.*\/|\?r=.+)/
-// @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*\/|\?r=.+)/
+// @include /^https?:\/\/.+\.(com|net)\/index\.php(\/survey\/.*|\?r=.+)/
+// @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*|\?r=.+)/
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
@@ -119,6 +119,7 @@ let SurveyTestHelper = {
 
     let chkBoxLabel = document.createElement("label");
 
+    // Auto Run Toggle Label
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
     chkBoxLabel.style["background-color"] = "rgba(255,255,255,0.7)";
     chkBoxLabel.style["border-radius"] = "5px";
@@ -128,6 +129,7 @@ let SurveyTestHelper = {
     chkBoxLabel.style.display = "block";
     chkBoxLabel.appendChild(this.activeCheckbox);
 
+    // Message Display
     this.alertDisplay.style["font-weight"] = "bold";
     this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.75)";
     this.alertDisplay.style["transition-duration"] = "0.75s";
@@ -135,15 +137,18 @@ let SurveyTestHelper = {
       this.style.color = "#000000";
     };
 
+    // Auto Run Toggle Checkbox
     this.activeCheckbox.type = "checkbox";
     this.activeCheckbox.style["margin-left"] = "10px";
     this.activeCheckbox.checked = this.active;
     this.activeCheckbox.onclick = this.setActivity.bind(this);
 
+    // Input and Continue Button
     this.button.style.display = "block";
     this.button.style.width = "100%";
     this.button.innerHTML = "Input and Continue";
-    
+
+    // Rounded background rectangle
     this.uiContainer.appendChild(chkBoxLabel);
     this.uiContainer.appendChild(this.button);
     this.uiContainer.appendChild(this.alertDisplay);
@@ -179,6 +184,7 @@ let SurveyTestHelper = {
         console.log("Question type for info display not found.");
     }
 
+    // Big orange circle with question code
     qCodeDisplay.innerHTML = this.questionCode;
     qCodeDisplay.style.height = "40px";
     qCodeDisplay.style.display = "inline-block";
@@ -233,7 +239,7 @@ let SurveyTestHelper = {
       localStorage.setItem(STH_HIDDEN, "0");
     }
 
-    if (prevQuestion == this.questionCode) {
+    if (prevQuestion === this.questionCode) {
       this.attempts = Number(attempts);
     } else {
       sessionStorage.removeItem(ATTEMPTS_NAME);
@@ -920,7 +926,7 @@ function getTimeStamp () {
 }
 
 function isHidden(element) {
-  return (element.offsetWidth == 0 || element.offsetHeight == 0 );
+  return (element.offsetWidth === 0 || element.offsetHeight === 0 );
 }
 
 var marginRightOffset = 15;
