@@ -411,19 +411,19 @@ let SurveyTestHelper = {
     if (questionText.includes("percent")) {
       context = Q_NUM_CONTEXT.percent;
     }
-    if (questionText.includes(" age") || questionText.includes("how old")) {
+    else if (questionText.includes(" age") || questionText.includes("how old")) {
       context = Q_NUM_CONTEXT.age;
     }
-    if (questionText.includes("postal ") || questionText.includes("zip ")) {
+    else if (questionText.includes("postal ") || questionText.includes("zip ")) {
       context = Q_NUM_CONTEXT.zipCode;
     }
-    if (questionText.includes(" many")
+    else if (questionText.includes(" many")
       || questionText.includes(" much")
       || questionText.includes(" number")
       || questionText.includes("amount")) {
       context = Q_NUM_CONTEXT.quantity;
     }
-    if (questionText.includes("year") || questionText.includes(" born") ) {
+    else if (questionText.includes("year") || questionText.includes(" born") ) {
       if (questionText.includes("9999")) {
         context = Q_NUM_CONTEXT.yearRef;
       } else if (questionText.includes("0000")) {
@@ -432,7 +432,7 @@ let SurveyTestHelper = {
         context = Q_NUM_CONTEXT.year;
       }
     }
-    if (questionText.includes("a scale")) {
+    else if (questionText.includes("a scale")) {
       context = Q_NUM_CONTEXT.scale;
     }
     return context;
