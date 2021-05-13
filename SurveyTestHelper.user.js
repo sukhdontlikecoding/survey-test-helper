@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.19.1
+// @version 2.19.2
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
-// @include /^https?:\/\/.+\.com\/index\.php\/survey\/.*/
-// @include /^https?:\/\/.+\.com\/index\.php\/[0-9]{6}.*/
+// @include /^https?:\/\/.+\.(com|net)\/index\.php(\/survey\/.*\/|\?r=.+)/
+// @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*\/|\?r=.+)/
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
@@ -16,7 +16,9 @@ const QUESTION_CLASSES = {
   "array-flexible-row": 4,
   "multiple-opt": 5,
   "list-dropdown": 6,
-  "numeric-multi": 7
+  "numeric-multi": 7,
+  "text-long": 8,
+  "multiple-short-txt": 9
 };
 const QUESTION_TYPE = {
   radio: 1,
@@ -25,7 +27,9 @@ const QUESTION_TYPE = {
   array: 4,
   mChoice: 5,
   dropdown: 6,
-  multiNumInput: 7
+  multiNumInput: 7,
+  longFreeText: 8,
+  multiShortFreeText: 9
 };
 const BUTTON_CODES = {
   right: 39,
@@ -97,7 +101,11 @@ let SurveyTestHelper = {
     document.onkeydown = this.buttonActionHandler.bind(this);
 
     document.body.appendChild(this.uiContainer);
-
+    
+    if(document.querySelector("button#movenextbtn")){
+      document.querySelector("button#movenextbtn").disabled = false;
+    }
+    
     if (this.active) {
       this.enterDummyResponse();
       this.clickNextButton();
@@ -364,6 +372,7 @@ let SurveyTestHelper = {
 
       for (const typeName in QUESTION_CLASSES) {
         if (containerClasses.contains(typeName)) {
+          console.log(typeName + " detected.");
           return QUESTION_CLASSES[typeName];
         }
       }
@@ -390,7 +399,7 @@ let SurveyTestHelper = {
       || questionText.includes("amount")) {
       context = Q_NUM_CONTEXT.quantity;
     }
-    if (questionText.includes("year ") || questionText.includes(" born") ) {
+    if (questionText.includes("year") || questionText.includes(" born") ) {
       if (questionText.includes("9999")) {
         context = Q_NUM_CONTEXT.yearRef;
       } else if (questionText.includes("0000")) {
@@ -412,7 +421,7 @@ let SurveyTestHelper = {
     if (questionText.includes("choos")
       || questionText.includes("select")
       || questionText.includes("pick")
-      || questionText.includes(" up to ")) {
+      || questionText.includes(" up to")) {
       if (questionText.includes(" two") || questionText.includes(" 2")) {
         context = Q_MC_CONTEXT.two;
       } else if (questionText.includes(" three") || questionText.includes(" 3")) {
@@ -466,6 +475,12 @@ let SurveyTestHelper = {
       case QUESTION_TYPE.dropdown:
         this.selectRandomDropdown();
         break;
+      case QUESTION_TYPE.longFreeText:
+        this.enterLFTValue();
+        break;
+      case QUESTION_TYPE.multiShortFreeText:
+        this.enterMSFTValue();
+        break;
       default:
         console.log("Handleable question type not found.");
     }
@@ -514,7 +529,7 @@ let SurveyTestHelper = {
     }
     if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
       let restrictedVals = this.commands.avoid[this.questionCode];
-      while (restrictedVals.includes(ansInputList[r].value) || ansInputList[r].offsetWidth == 0 || ansInputList[r].offsetHeight == 0 ) {
+      while (restrictedVals.includes(ansInputList[r].value) || isHidden(ansInputList[r])) {
         r = roll(0, ansInputList.length);
       }
     }
@@ -526,7 +541,7 @@ let SurveyTestHelper = {
       switch (context) {
         case Q_NUM_CONTEXT.age:
         case Q_NUM_CONTEXT.percent:
-          otherOpt.value = roll(18, 100);
+          otherOpt.value = roll(18, 99);
           break;
         case Q_NUM_CONTEXT.year:
           otherOpt.value = roll(1910, validAgeYear);
@@ -538,7 +553,7 @@ let SurveyTestHelper = {
           otherOpt.value = roll(0, 20);
           break;
         case Q_NUM_CONTEXT.scale:
-          otherOpt.value = roll(0, 100);
+          otherOpt.value = roll(40, 100);
           break;
         default:  // Generic string response
           otherOpt.value = "Run at: " + getTimeStamp();
@@ -578,7 +593,7 @@ let SurveyTestHelper = {
       switch (context) {
         case Q_NUM_CONTEXT.age:
         case Q_NUM_CONTEXT.percent:
-          inputVal = generateNumericInput(18, 100);
+          inputVal = "0" + generateNumericInput(18, 99).toString();
           break;
         case Q_NUM_CONTEXT.year:
           inputVal = generateNumericInput(1910, validAgeYear);
@@ -604,7 +619,28 @@ let SurveyTestHelper = {
   enterSFTValue: function () {
     let inputElement = document.querySelector("div.question-container input.text");
 
-    inputElement.value = "Run at: " + getTimeStamp();
+    // Only set the value if there is nothing already in
+    if (inputElement.value.length === 0) {
+      inputElement.value = "Run at: " + getTimeStamp();
+    }
+  },
+  enterMSFTValue: function () {
+    let inputElement = document.querySelectorAll("div.question-container input.text");
+    
+    inputElement.forEach(e => {
+      // Only set the value if there is nothing already in
+      if (e.value.length === 0) {
+        e.value = "Run at: " + getTimeStamp();
+      }      
+    });
+  },
+  enterLFTValue: function () {
+    let inputElement = document.querySelector("div.question-container textarea");
+
+    // Only set the value if there is nothing already in
+    if (inputElement.value.length === 0) {
+      inputElement.value = "Run at: " + getTimeStamp();
+    }
   },
   selectArrayOptions: function () {
     let arrayTable = document.querySelector("table.questions-list");
@@ -613,13 +649,15 @@ let SurveyTestHelper = {
     rows.forEach(row => {
       options = row.querySelectorAll("td>input.radio");
       r = roll(0, options.length);
-      options[r].checked = true;
+      if (!isHidden(options[r])) {
+      	options[r].checked = true;
+      }
     });
   },
   selectMultipleChoiceOptions: function () {
     let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
     let context = this.getMCContext();
-    let numToCheck = roll(1, context ? context + 1 : Math.ceil(checkboxes.length / 2));
+    let numToCheck = roll(2, context ? context : Math.ceil(checkboxes.length / 3));
     let toBeChecked = [];
     let r = 0;
     let forced = false;
