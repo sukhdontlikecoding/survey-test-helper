@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.19.2
+// @version 2.20.2
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -88,7 +88,7 @@ let SurveyTestHelper = {
 
     this.addErrorAlertListener();
     this.questionCode = document.querySelector("span#QNameNumData");
-    this.questionCode = this.questionCode ? this.questionCode.dataset.code : "N/A";
+    this.questionCode = this.questionCode ? this.questionCode.dataset.code : "Main Survey Page";
 
     this.questionType = this.getQuestionType();
     this.commands = this.queryCommands();
@@ -101,11 +101,11 @@ let SurveyTestHelper = {
     document.onkeydown = this.buttonActionHandler.bind(this);
 
     document.body.appendChild(this.uiContainer);
-    
+
     if(document.querySelector("button#movenextbtn")){
       document.querySelector("button#movenextbtn").disabled = false;
     }
-    
+
     if (this.active) {
       this.enterDummyResponse();
       this.clickNextButton();
@@ -149,12 +149,6 @@ let SurveyTestHelper = {
     this.button.innerHTML = "Input and Continue";
 
     // Rounded background rectangle
-    this.uiContainer.appendChild(chkBoxLabel);
-    this.uiContainer.appendChild(this.button);
-    this.uiContainer.appendChild(this.alertDisplay);
-
-    this.initQuestionInfoDisplay();
-
     this.uiContainer.style.position = "fixed";
     this.uiContainer.style.padding = "7px";
     this.uiContainer.style.right = "0px";
@@ -165,10 +159,20 @@ let SurveyTestHelper = {
     this.uiContainer.style["background-color"] = "rgba(0,0,0,0.1)";
     this.uiContainer.style["border-radius"] = "10px";
     this.uiContainer.style["text-align"] = "center";
+
+    this.uiContainer.append(chkBoxLabel, this.button, this.alertDisplay);
+
+    this.initQuestionInfoDisplay();
   },
   initQuestionInfoDisplay: function () {
     let qCodeDisplay = document.createElement("div");
     let qContainer = document.querySelector("div.question-container");
+
+    let mainSurveyPageLink = document.createElement("a");
+
+    // The big orange button is a link to a relevant page in a new tab
+    mainSurveyPageLink.target = "_blank";
+    mainSurveyPageLink.appendChild(qCodeDisplay);
 
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
@@ -196,14 +200,28 @@ let SurveyTestHelper = {
     qCodeDisplay.style["background-color"] = "orange";
     qCodeDisplay.style["border-radius"] = "20px";
     qCodeDisplay.style["font-weight"] = "bold";
-    
+
     qCodeDisplay.dataset.opacity = 0.95;
 
     if (qContainer) {
-      qContainer.appendChild(qCodeDisplay);
+      // In question, attach the question code display to the top of the question container
+      // Link the big orange button to the question edit page
+      // sgqCode is of the format {SurveyID}X{GroupID}X{QuestionID}
+      let sgqCode = document.querySelector("input#lastanswer").value.split("X");
+      mainSurveyPageLink.href = window.location.origin +
+        "/index.php" + (window.location.search.startsWith("?r=") ? "?r=" : "/") +
+        "admin/questions/sa/view/surveyid/" + sgqCode[0] +
+        "/gid/" + sgqCode[1] +
+        "/qid/" + sgqCode[2];
+      qContainer.appendChild(mainSurveyPageLink);
       this.infoElements.push(qCodeDisplay);
     } else {
-      this.uiContainer.prepend(qCodeDisplay);
+      // Not in question, attach the question code display to the top of the UI container
+      // Link the big orange button to the main survey page
+      mainSurveyPageLink.href = window.location.origin +
+        "/index.php" + (window.location.search.startsWith("?r=") ? "?r=" : "/") +
+        "admin/survey/sa/view/surveyid/" + window.location.pathname.match(/[0-9]{6}/)[0];
+      this.uiContainer.prepend(mainSurveyPageLink);
       qCodeDisplay.style.position = "relative";
       qCodeDisplay.style.top = "0px";
     }
@@ -632,12 +650,12 @@ let SurveyTestHelper = {
   },
   enterMSFTValue: function () {
     let inputElement = document.querySelectorAll("div.question-container input.text");
-    
+
     inputElement.forEach(e => {
       // Only set the value if there is nothing already in
       if (e.value.length === 0) {
         e.value = "Run at: " + getTimeStamp();
-      }      
+      }
     });
   },
   enterLFTValue: function () {
@@ -686,7 +704,7 @@ let SurveyTestHelper = {
     try {
       if (this.commands.force && this.commands.force[this.questionCode]) {
         let forcedVals = this.commands.force[this.questionCode];
-        for (let i = 0; i < subquestionCodes.length 
+        for (let i = 0; i < subquestionCodes.length
           && toBeChecked.length < numToCheck
           && toBeChecked.length < forcedVals.length; i++) {
           // Check every option that is forced
