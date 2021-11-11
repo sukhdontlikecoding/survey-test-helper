@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name    Survey Test Helper
-// @version 2.20.2
+// @name    Survey Test Helper TEST
+// @version 2.20.3
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -18,7 +18,8 @@ const QUESTION_CLASSES = {
   "list-dropdown": 6,
   "numeric-multi": 7,
   "text-long": 8,
-  "multiple-short-txt": 9
+  "multiple-short-txt": 9,
+  "text-huge":10
 };
 const QUESTION_TYPE = {
   radio: 1,
@@ -29,7 +30,8 @@ const QUESTION_TYPE = {
   dropdown: 6,
   multiNumInput: 7,
   longFreeText: 8,
-  multiShortFreeText: 9
+  multiShortFreeText: 9,
+  textHuge: 10
 };
 const BUTTON_CODES = {
   right: 39,
@@ -141,7 +143,7 @@ let SurveyTestHelper = {
     this.activeCheckbox.type = "checkbox";
     this.activeCheckbox.style["margin-left"] = "10px";
     this.activeCheckbox.checked = this.active;
-    this.activeCheckbox.onclick = this.setActivity.bind(this);
+    this.activeCheckbox.onclick = this.toggleActive.bind(this);
 
     // Input and Continue Button
     this.button.style.display = "block";
@@ -311,12 +313,15 @@ let SurveyTestHelper = {
       prevBtn.click();
     }
   },
-  setActivity: function (e) {
-    this.active = e.target ? e.target.checked : e;
-    this.activeCheckbox.checked = this.active;
-    console.log("Activity changed: ", this.active);
+  setActive: function (val) {
+    this.active = val;
+    this.activeCheckbox.checked = val;
+    console.log("Activity changed: ", val);
 
-    this.setStorageActivity(this.active);
+    this.setStorageActivity(val);
+  },
+  toggleActive: function () {
+    this.setActive(!this.active);
   },
   setStorageActivity: function (activity) {
     localStorage.setItem(ACTIVE_NAME, activity ? "1" : "0");
@@ -378,7 +383,8 @@ let SurveyTestHelper = {
           this.clickPrevButton();
           break;
         case BUTTON_CODES.spacebar:
-          this.setActivity(!this.active);
+          this.activeCheckbox.blur();
+          this.toggleActive();
           break;
         case BUTTON_CODES.insert:
           this.enterDummyResponse();
@@ -445,6 +451,7 @@ let SurveyTestHelper = {
     if (questionText.includes("choos")
       || questionText.includes("select")
       || questionText.includes("pick")
+      || questionText.includes("which ")
       || questionText.includes(" up to")) {
       if (questionText.includes(" two") || questionText.includes(" 2")) {
         context = Q_MC_CONTEXT.two;
@@ -474,7 +481,7 @@ let SurveyTestHelper = {
           mutation.target.querySelector("div.modal-footer > a.btn.btn-default").click();
         }
         if (!this.errorDeactivateOverride) {
-          this.setActivity(false);
+          this.setActive(false);
         }
       }
     });
@@ -482,28 +489,31 @@ let SurveyTestHelper = {
   enterDummyResponse: function () {
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
-        this.selectRandomRadio();
+        this.inputRadio();
         break;
       case QUESTION_TYPE.numericInput:
-        this.enterNumericValue();
+        this.inputNumericValue();
         break;
       case QUESTION_TYPE.shortFreeText:
-        this.enterSFTValue();
+        this.inputSFTValue();
         break;
       case QUESTION_TYPE.array:
-        this.selectArrayOptions();
+        this.inputArrayOptions();
         break;
       case QUESTION_TYPE.mChoice:
-        this.selectMultipleChoiceOptions();
+        this.inputMultipleChoiceOptions();
         break;
       case QUESTION_TYPE.dropdown:
-        this.selectRandomDropdown();
+        this.inputDropdown();
         break;
       case QUESTION_TYPE.longFreeText:
-        this.enterLFTValue();
+        this.inputLFTValue();
         break;
       case QUESTION_TYPE.multiShortFreeText:
-        this.enterMSFTValue();
+        this.inputMSFTValue();
+        break;
+      case QUESTION_TYPE.textHuge:
+        this.inputHeatmap();
         break;
       default:
         console.log("Handleable question type not found.");
@@ -519,7 +529,7 @@ let SurveyTestHelper = {
         break;
     }
   },
-  selectRandomRadio: function () {
+  inputRadio: function () {
     let ansList = document.querySelectorAll("div.answers-list > div.answer-item");
     let ansInputList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
     let r = roll(0, ansInputList.length);
@@ -599,7 +609,7 @@ let SurveyTestHelper = {
       }
     }
   },
-  enterNumericValue: function () {
+  inputNumericValue: function () {
     let inputVal = 0;
     let inputElement = document.querySelector("div.question-container input.numeric");
 
@@ -640,7 +650,7 @@ let SurveyTestHelper = {
 
     inputElement.value = inputVal;
   },
-  enterSFTValue: function () {
+  inputSFTValue: function () {
     let inputElement = document.querySelector("div.question-container input.text");
 
     // Only set the value if there is nothing already in
@@ -648,7 +658,7 @@ let SurveyTestHelper = {
       inputElement.value = "Run at: " + getTimeStamp();
     }
   },
-  enterMSFTValue: function () {
+  inputMSFTValue: function () {
     let inputElement = document.querySelectorAll("div.question-container input.text");
 
     inputElement.forEach(e => {
@@ -658,7 +668,7 @@ let SurveyTestHelper = {
       }
     });
   },
-  enterLFTValue: function () {
+  inputLFTValue: function () {
     let inputElement = document.querySelector("div.question-container textarea");
 
     // Only set the value if there is nothing already in
@@ -666,7 +676,7 @@ let SurveyTestHelper = {
       inputElement.value = "Run at: " + getTimeStamp();
     }
   },
-  selectArrayOptions: function () {
+  inputArrayOptions: function () {
     let arrayTable = document.querySelector("table.questions-list");
     let rows = arrayTable.querySelectorAll(".answers-list");
     let options, r;
@@ -678,7 +688,7 @@ let SurveyTestHelper = {
       }
     });
   },
-  selectMultipleChoiceOptions: function () {
+  inputMultipleChoiceOptions: function () {
     let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
     let context = this.getMCContext();
     let numToCheck = roll(2, context ? context : Math.ceil(checkboxes.length / 3));
@@ -755,7 +765,7 @@ let SurveyTestHelper = {
       }
     });
   },
-  selectRandomDropdown: function () {
+  inputDropdown: function () {
     let dropdownElements = document.querySelector("div.question-container select.list-question-select");
     let r = roll(0, dropdownElements.length);
     let forced = false;
@@ -783,6 +793,22 @@ let SurveyTestHelper = {
     }
 
     dropdownElements[r].selected = true;
+  },
+  inputHeatmap: function () {
+    let range = document.createRange();
+    let heatmap = document.querySelector("#contentHeatMap");
+    let content = heatmap.childNodes[0];
+
+    range.setStart(content, 0);
+    range.setEnd(content, 1);
+
+    window.getSelection().addRange(range);
+
+    heatmap.dispatchEvent(new MouseEvent("mouseup",{
+      view: window,
+      bubbles: true,
+      cancelable: true
+    }));
   },
   queryCommands: function () {
     // commands are html tags with data attributes of the same name containing
