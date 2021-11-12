@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper TEST
-// @version 2.20.3
+// @version 2.21.0
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -63,13 +63,22 @@ const STH_COMMANDS = [
   "avoid",
   "force"
 ];
-const STH_ERROR = {
-  hiddenOptionForced: 1
+const STH_ALERTCODE = {
+  invalidAnswer: 1,
+  hiddenOptionForced: 2,
+  unexpectedNonMandatory: 3,
 };
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
 const COMMAND_OBJ_NAME = "STH_commands";
 const STH_HIDDEN = "STH_hidden";
+
+class Alert {
+  constructor(code = 0, message = "Generic Alert Message") {
+    this.code = code;
+    this.message = message;
+  }
+}
 
 let curDate = new Date();
 let validAgeYear = curDate.getFullYear() - 18;
@@ -85,6 +94,7 @@ let SurveyTestHelper = {
   infoElements: [],
   errorDeactivateOverride: false,
   errorAlertShown: false,
+  alerts:[],
   initialize: function () {
     console.log("Initializing...");
 
@@ -97,6 +107,8 @@ let SurveyTestHelper = {
 
     this.initStorage();
     this.initUI();
+
+    this.checkMandatory();
 
     // Attach handlers
     this.button.onclick = this.buttonActionHandler.bind(this);
@@ -135,6 +147,7 @@ let SurveyTestHelper = {
     this.alertDisplay.style["font-weight"] = "bold";
     this.alertDisplay.style["background-color"] = "rgba(255,255,255,0.75)";
     this.alertDisplay.style["transition-duration"] = "0.75s";
+    this.alertDisplay.style.color = "#000000";
     this.alertDisplay.ontransitionend = function () {
       this.style.color = "#000000";
     };
@@ -289,12 +302,31 @@ let SurveyTestHelper = {
       sessionStorage.setItem(COMMAND_OBJ_NAME, JSON.stringify(this.commands));
     }
   },
-  setAlert: function (alertText = "Generic Error Alert.") {
-    this.alertDisplay.innerHTML = alertText;
-    this.alertDisplay.style.padding = "5px";
-    this.alertDisplay.style["margin-top"] = "5px";
-    this.alertDisplay.style.border = "1px solid black";
-    this.alertDisplay.style.color = "#FF0000";
+  addAlert: function (alert) {
+    this.alerts.push(alert);
+
+    this.displayAlerts();
+  },
+  displayAlerts: function () {
+    window.setTimeout (function () {
+      if (this.alerts.length > 0) {
+        let codeShown = [];
+        let alertString = [];
+        this.alerts.forEach(a => {
+          if (!codeShown.includes(a.code)) {
+            codeShown.push(a.code);
+            alertString.push(a.message);
+          }
+
+          this.alertDisplay.innerHTML = alertString.join("<br />");
+        });
+
+        this.alertDisplay.style.padding = "5px";
+        this.alertDisplay.style["margin-top"] = "5px";
+        this.alertDisplay.style.border = "1px solid black";
+        this.alertDisplay.style.color = "#FF0000";
+      }
+    }.bind(this), 25);
   },
   clickNextButton: function () {
     let nextBtn = document.querySelector("#movenextbtn") || document.querySelector("#movesubmitbtn");
@@ -476,7 +508,9 @@ let SurveyTestHelper = {
   alertFoundHandler: function (mutationList, observer) {
     mutationList.forEach(mutation => {
       if (mutation.attributeName === "style" && mutation.target.style.display !== "none") {
-        this.setAlert("Answer Invalid." + (this.active ? " Pausing run..." : ""));
+        this.addAlert(new Alert(STH_ALERTCODE.invalidAnswer, "Answer Invalid." + 
+          (this.active ? " Pausing run..." : ""))
+        );
         if (!this.hidden) {
           mutation.target.querySelector("div.modal-footer > a.btn.btn-default").click();
         }
@@ -559,7 +593,7 @@ let SurveyTestHelper = {
       }
     }
     catch (e) {
-      this.setAlert(e);
+      this.addAlert(new Alert(STH_ALERTCODE.hiddenOptionForced, e));
     }
     if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
       let restrictedVals = this.commands.avoid[this.questionCode];
@@ -731,7 +765,7 @@ let SurveyTestHelper = {
       }
     }
     catch (e) {
-      this.setAlert(e);
+      this.addAlert(new Alert(STH_ALERTCODE.hiddenOptionForced, e));
     }
     if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
       restrictedVals = this.commands.avoid[this.questionCode];
@@ -944,6 +978,13 @@ let SurveyTestHelper = {
 
       this.infoElements.push(infoDiv);
     }
+  },
+  checkMandatory: function () {
+    let mandatoryAsterisk = document.querySelector("div.question-text>span.text-danger.asterisk");
+
+    if (this.getQuestionType() && !mandatoryAsterisk) {
+      this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory, "WARNING: Non-mandatory question detected."));
+    }
   }
 };
 
@@ -965,8 +1006,8 @@ function generateNumericInput (min, max, refusedVal=-1) {
 function getTimeStamp () {
   return String(curDate.getMonth() + 1).padStart(2, "0") + "-" +
     String(curDate.getDate()).padStart(2, "0") + " " +
-    String(curDate.getHours()).padStart(2,"0") + ":" +
-    String(curDate.getMinutes()).padStart(2,"0");
+    String(curDate.getHours()).padStart(2, "0") + ":" +
+    String(curDate.getMinutes()).padStart(2, "0");
 }
 
 function isHidden(element) {
