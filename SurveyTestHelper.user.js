@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name    Survey Test Helper TEST
-// @version 2.21.0
+// @name    Survey Test Helper
+// @version 2.22.1
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -19,18 +19,18 @@ const QUESTION_CLASSES = {
   "numeric-multi": 7,
   "text-long": 8,
   "multiple-short-txt": 9,
-  "text-huge":10
+  "text-huge": 10
 };
 const QUESTION_TYPE = {
   radio: 1,
   numericInput: 2,
   shortFreeText: 3,
   array: 4,
-  mChoice: 5,
+  multipleChoice: 5,
   dropdown: 6,
-  multiNumInput: 7,
+  multipleNumericInput: 7,
   longFreeText: 8,
-  multiShortFreeText: 9,
+  multipleShortFreeText: 9,
   textHuge: 10
 };
 const BUTTON_CODES = {
@@ -67,6 +67,7 @@ const STH_ALERTCODE = {
   invalidAnswer: 1,
   hiddenOptionForced: 2,
   unexpectedNonMandatory: 3,
+  duplicateAnswer: 4
 };
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
@@ -109,6 +110,9 @@ let SurveyTestHelper = {
     this.initUI();
 
     this.checkMandatory();
+    this.checkDuplicateAnswers();
+
+    this.initQuestionInfoDisplay();
 
     // Attach handlers
     this.button.onclick = this.buttonActionHandler.bind(this);
@@ -176,8 +180,6 @@ let SurveyTestHelper = {
     this.uiContainer.style["text-align"] = "center";
 
     this.uiContainer.append(chkBoxLabel, this.button, this.alertDisplay);
-
-    this.initQuestionInfoDisplay();
   },
   initQuestionInfoDisplay: function () {
     let qCodeDisplay = document.createElement("div");
@@ -196,7 +198,7 @@ let SurveyTestHelper = {
       case QUESTION_TYPE.array:
         this.generateArrayInfoDisplay();
         break;
-      case QUESTION_TYPE.mChoice:
+      case QUESTION_TYPE.multipleChoice:
         this.generateMChoiceInfoDisplay();
         break;
       default:
@@ -508,7 +510,7 @@ let SurveyTestHelper = {
   alertFoundHandler: function (mutationList, observer) {
     mutationList.forEach(mutation => {
       if (mutation.attributeName === "style" && mutation.target.style.display !== "none") {
-        this.addAlert(new Alert(STH_ALERTCODE.invalidAnswer, "Answer Invalid." + 
+        this.addAlert(new Alert(STH_ALERTCODE.invalidAnswer, "Answer Invalid." +
           (this.active ? " Pausing run..." : ""))
         );
         if (!this.hidden) {
@@ -534,7 +536,7 @@ let SurveyTestHelper = {
       case QUESTION_TYPE.array:
         this.inputArrayOptions();
         break;
-      case QUESTION_TYPE.mChoice:
+      case QUESTION_TYPE.multipleChoice:
         this.inputMultipleChoiceOptions();
         break;
       case QUESTION_TYPE.dropdown:
@@ -543,7 +545,7 @@ let SurveyTestHelper = {
       case QUESTION_TYPE.longFreeText:
         this.inputLFTValue();
         break;
-      case QUESTION_TYPE.multiShortFreeText:
+      case QUESTION_TYPE.multipleShortFreeText:
         this.inputMSFTValue();
         break;
       case QUESTION_TYPE.textHuge:
@@ -558,7 +560,7 @@ let SurveyTestHelper = {
       case QUESTION_TYPE.radio:
         this.clearRadio();
         break;
-      case QUESTION_TYPE.mChoice:
+      case QUESTION_TYPE.multipleChoice:
         this.clearMChoice();
         break;
     }
@@ -984,6 +986,37 @@ let SurveyTestHelper = {
 
     if (this.getQuestionType() && !mandatoryAsterisk) {
       this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory, "WARNING: Non-mandatory question detected."));
+    }
+  },
+  checkDuplicateAnswers: function () {
+    let ansList = null;
+
+    switch (this.questionType) {
+      case QUESTION_TYPE.radio:
+        ansList = document.querySelectorAll("div.answers-list > div.answer-item");
+        break;
+      case QUESTION_TYPE.dropdown:
+        ansList = document.querySelector("div.question-container select.list-question-select");
+        break;
+      case QUESTION_TYPE.multipleChoice:
+        ansList = document.querySelectorAll("div.questions-list div.answer-item");
+        break;
+      case QUESTION_TYPE.array:
+        ansList = document.querySelectorAll("thead th.th-9");
+        break;
+    }
+
+    if (ansList) {
+      for (let i = 0; i < ansList.length - 1; i++) {
+        for (let i2 = i + 1; i2 < ansList.length; i2++) {
+          if (ansList[i].innerText.trim() == ansList[i2].innerText.trim()) {
+            ansList[i].style.border = "dashed 3px red";
+            ansList[i2].style.border = "dashed 3px red";
+
+            this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer, "WARNING: Duplicate option text detected."));
+          }
+        }
+      }
     }
   }
 };
