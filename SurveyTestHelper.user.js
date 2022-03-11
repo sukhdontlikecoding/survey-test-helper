@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.22.1
+// @version 2.22.2
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -67,7 +67,8 @@ const STH_ALERTCODE = {
   invalidAnswer: 1,
   hiddenOptionForced: 2,
   unexpectedNonMandatory: 3,
-  duplicateAnswer: 4
+  duplicateAnswer: 4,
+  duplicateText: 5
 };
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
@@ -81,6 +82,7 @@ class Alert {
   }
 }
 
+const infoDisplayOpacity = 0.75;
 let curDate = new Date();
 let validAgeYear = curDate.getFullYear() - 18;
 
@@ -93,6 +95,7 @@ let SurveyTestHelper = {
   commands: null,
   commandsFound: false,
   infoElements: [],
+  alertBorderElements: [],
   errorDeactivateOverride: false,
   errorAlertShown: false,
   alerts:[],
@@ -109,8 +112,9 @@ let SurveyTestHelper = {
     this.initStorage();
     this.initUI();
 
+    // Highlight potential errors
     this.checkMandatory();
-    this.checkDuplicateAnswers();
+    this.checkDuplicateText();
 
     this.initQuestionInfoDisplay();
 
@@ -206,32 +210,42 @@ let SurveyTestHelper = {
     }
 
     // Big orange circle with question code
+    qCodeDisplay.dataset.opacity = 0.95;
+
     qCodeDisplay.innerHTML = this.questionCode;
     qCodeDisplay.style.height = "40px";
     qCodeDisplay.style.display = "inline-block";
-    qCodeDisplay.style.color = "floralwhite";
     qCodeDisplay.style.position = "absolute";
     qCodeDisplay.style.top = "-20px";
-    qCodeDisplay.style.opacity = this.hidden ? 0 : 0.95;
+    qCodeDisplay.style.opacity = this.hidden ? 0 : qCodeDisplay.dataset.opacity;
     qCodeDisplay.style.padding = "10px";
-    qCodeDisplay.style["background-color"] = "orange";
     qCodeDisplay.style["border-radius"] = "20px";
     qCodeDisplay.style["font-weight"] = "bold";
 
-    qCodeDisplay.dataset.opacity = 0.95;
+    this.infoElements.push(qCodeDisplay);
 
-    if (qContainer) {
+    // Set generic style settings for each infoDisplay element
+    this.infoElements.forEach(e => {
+      e.style.color = "white";
+      e.style["background-color"] = "orangered";
+      e.style["font-weight"] = "bold";
+      e.style["transition-duration"] = "0.5s";
+    });
+
+    // Position and further style big button if needed
+    let lastAnsElement = document.querySelector("input#lastanswer");
+
+    if (qContainer && lastAnsElement) {
       // In question, attach the question code display to the top of the question container
       // Link the big orange button to the question edit page
       // sgqCode is of the format {SurveyID}X{GroupID}X{QuestionID}
-      let sgqCode = document.querySelector("input#lastanswer").value.split("X");
+      let sgqCode = lastAnsElement.value.split("X");
       mainSurveyPageLink.href = window.location.origin +
         "/index.php" + (window.location.search.startsWith("?r=") ? "?r=" : "/") +
         "admin/questions/sa/view/surveyid/" + sgqCode[0] +
         "/gid/" + sgqCode[1] +
         "/qid/" + sgqCode[2];
       qContainer.appendChild(mainSurveyPageLink);
-      this.infoElements.push(qCodeDisplay);
     } else {
       // Not in question, attach the question code display to the top of the UI container
       // Link the big orange button to the main survey page
@@ -241,15 +255,10 @@ let SurveyTestHelper = {
       this.uiContainer.prepend(mainSurveyPageLink);
       qCodeDisplay.style.position = "relative";
       qCodeDisplay.style.top = "0px";
-    }
 
-    // Set generic style settings for each infoDisplay element
-    this.infoElements.forEach(e => {
-      e.style.color = "white";
-      e.style["background-color"] = "orangered";
-      e.style["font-weight"] = "bold";
-      e.style["transition-duration"] = "0.5s";
-    });
+      qCodeDisplay.style.color = "floralwhite";
+      qCodeDisplay.style["background-color"] = "orange";
+    }
   },
   initStorage: function () {
     let activity = localStorage.getItem(ACTIVE_NAME);
@@ -364,9 +373,11 @@ let SurveyTestHelper = {
     if (this.hidden) {
       this.showUI();
       this.showInfoElements();
+      this.showAlertBorders();
     } else {
       this.hideUI();
       this.hideInfoElements();
+      this.hideAlertBorders();
     }
     this.setStorageHidden(this.hidden);
   },
@@ -386,6 +397,12 @@ let SurveyTestHelper = {
   },
   hideInfoElements: function () {
     this.infoElements.forEach(element => element.style.opacity = 0);
+  },
+  showAlertBorders: function () {
+    this.alertBorderElements.forEach(element => element.style["border-color"] = "rgba(255,0,0,1)");
+  },
+  hideAlertBorders: function () {
+    this.alertBorderElements.forEach(element => element.style["border-color"] = "rgba(0,0,0,0)");
   },
   buttonActionHandler: function (e) {
     switch (e.type) {
@@ -689,8 +706,12 @@ let SurveyTestHelper = {
   inputSFTValue: function () {
     let inputElement = document.querySelector("div.question-container input.text");
 
-    // Only set the value if there is nothing already in
-    if (inputElement.value.length === 0) {
+    if (this.commands.force && this.commands.force[this.questionCode]) {
+      let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
+
+      inputElement.value = forcedVal;
+    } else if (inputElement.value.length === 0) {
+      // Only set the value if there is nothing already in
       inputElement.value = "Run at: " + getTimeStamp();
     }
   },
@@ -707,8 +728,12 @@ let SurveyTestHelper = {
   inputLFTValue: function () {
     let inputElement = document.querySelector("div.question-container textarea");
 
-    // Only set the value if there is nothing already in
-    if (inputElement.value.length === 0) {
+    if (this.commands.force && this.commands.force[this.questionCode]) {
+      let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
+
+      inputElement.value = forcedVal;
+    } else if (inputElement.value.length === 0) {
+      // Only set the value if there is nothing already in
       inputElement.value = "Run at: " + getTimeStamp();
     }
   },
@@ -883,18 +908,19 @@ let SurveyTestHelper = {
     // Subquestion code display
     for (let i = 0; i < rows.length; i++) {
       let infoDiv = document.createElement("div");
+
+      infoDiv.dataset.opacity = infoDisplayOpacity;
+
       infoDiv.innerHTML = rows[i].id.split(qID)[1];
       infoDiv.style.position = "absolute";
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px 0.5em";
       infoDiv.style.color = "white";
-      infoDiv.style.opacity = this.hidden ? 0 : 0.75;
+      infoDiv.style.opacity = this.hidden ? 0 : infoDiv.dataset.opacity;
       infoDiv.style["background-color"] = "orangered";
       infoDiv.style["border-radius"] = "50% 0 0 10%";
       infoDiv.style["font-weight"] = "bold";
       infoDiv.style["transition-duration"] = "0.5s";
-
-      infoDiv.dataset.opacity = 0.75;
 
       rows[i].appendChild(infoDiv);
 
@@ -905,16 +931,17 @@ let SurveyTestHelper = {
     // Answer option value display
     for (let j = 0; j < firstRowCells.length; j++) {
       let infoDiv = document.createElement("div");
+
+      infoDiv.dataset.opacity = infoDisplayOpacity;
+
       infoDiv.innerHTML = firstRowCells[j].value;
       infoDiv.style.position = "absolute";
       infoDiv.style.top = "-" + rowHeight;
       infoDiv.style.left = "50%";
       infoDiv.style.padding = "3px 0.5em";
-      infoDiv.style.opacity = this.hidden ? 0 : 0.75;
+      infoDiv.style.opacity = this.hidden ? 0 : infoDiv.dataset.opacity;
       infoDiv.style["transform"] = "translate(-50%, -100%)";
       infoDiv.style["border-radius"] = "45% 45% 5px 5px";
-
-      infoDiv.dataset.opacity = 0.75;
 
       let infoDivContainer = document.createElement("div");
       infoDivContainer.style.position = "relative";
@@ -931,10 +958,13 @@ let SurveyTestHelper = {
     // Answer option value display
     for (let i = 0; i < ansList.length; i++) {
       let infoDiv = document.createElement("div");
+
+      infoDiv.dataset.opacity = infoDisplayOpacity;
+
       infoDiv.innerHTML = ansList[i].value;
       infoDiv.style.position = "absolute";
       infoDiv.style.top = "-0.3em";
-      infoDiv.style.opacity = this.hidden ? 0 : 0.75;
+      infoDiv.style.opacity = this.hidden ? 0 : infoDiv.dataset.opacity;
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px";
       infoDiv.style.hyphens = "none";
@@ -945,8 +975,6 @@ let SurveyTestHelper = {
       infoDiv.style["margin-right"] = "1em";
       infoDiv.style["border-radius"] = "30px";
       infoDiv.style["padding-top"] = "0.2em";
-
-      infoDiv.dataset.opacity = 0.75;
 
       ansList[i].closest("div.answer-item").appendChild(infoDiv);
 
@@ -959,10 +987,13 @@ let SurveyTestHelper = {
 
     for (let i = 0; i < choiceList.length; i++) {
       let infoDiv = document.createElement("div");
+
+      infoDiv.dataset.opacity = infoDisplayOpacity;
+
       infoDiv.innerHTML = choiceList[i].id.split(qID)[1];
       infoDiv.style.position = "absolute";
       infoDiv.style.top = "-0.3em";
-      infoDiv.style.opacity = this.hidden ? 0 : 0.75;
+      infoDiv.style.opacity = this.hidden ? 0 : infoDiv.dataset.opacity;
       infoDiv.style.right = "100%";
       infoDiv.style.padding = "3px";
       infoDiv.style.hyphens = "none";
@@ -973,8 +1004,6 @@ let SurveyTestHelper = {
       infoDiv.style["margin-right"] = "-0.5em";
       infoDiv.style["border-radius"] = "30px";
       infoDiv.style["padding-top"] = "0.2em";
-
-      infoDiv.dataset.opacity = 0.75;
 
       choiceList[i].appendChild(infoDiv);
 
@@ -988,32 +1017,52 @@ let SurveyTestHelper = {
       this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory, "WARNING: Non-mandatory question detected."));
     }
   },
-  checkDuplicateAnswers: function () {
-    let ansList = null;
+  checkDuplicateText: function () {
+    let textElement = null;
 
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
-        ansList = document.querySelectorAll("div.answers-list > div.answer-item");
+        textElement = document.querySelectorAll("div.answers-list > div.answer-item");
         break;
       case QUESTION_TYPE.dropdown:
-        ansList = document.querySelector("div.question-container select.list-question-select");
+        textElement = document.querySelector("div.question-container select.list-question-select");
         break;
       case QUESTION_TYPE.multipleChoice:
-        ansList = document.querySelectorAll("div.questions-list div.answer-item");
+        textElement = document.querySelectorAll("div.questions-list div.answer-item");
         break;
       case QUESTION_TYPE.array:
-        ansList = document.querySelectorAll("thead th.th-9");
+        textElement = document.querySelectorAll("thead th.th-9");
         break;
     }
 
-    if (ansList) {
-      for (let i = 0; i < ansList.length - 1; i++) {
-        for (let i2 = i + 1; i2 < ansList.length; i2++) {
-          if (ansList[i].innerText.trim() == ansList[i2].innerText.trim()) {
-            ansList[i].style.border = "dashed 3px red";
-            ansList[i2].style.border = "dashed 3px red";
+    if (textElement) {
+      for (let i = 0; i < textElement.length - 1; i++) {
+        for (let i2 = i + 1; i2 < textElement.length; i2++) {
+          if (textElement[i].innerText.trim() == textElement[i2].innerText.trim()) {
+            textElement[i].style.border = "dashed 3px red";
+            textElement[i2].style.border = "dashed 3px red";
+
+            this.alertBorderElements.push(textElement[i], textElement[i2]);
 
             this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer, "WARNING: Duplicate option text detected."));
+          }
+        }
+      }
+    }
+
+    // Check array subquestion text as well
+    if (this.questionType === QUESTION_TYPE.array) {
+      textElement = document.querySelectorAll(".answertext");
+
+      for (let i = 0; i < textElement.length - 1; i++) {
+        for (let i2 = i + 1; i2 < textElement.length; i2++) {
+          if (textElement[i].innerText.trim() == textElement[i2].innerText.trim()) {
+            textElement[i].style.border = "dashed 3px red";
+            textElement[i2].style.border = "dashed 3px red";
+
+            this.alertBorderElements.push(textElement[i], textElement[i2]);
+
+            this.addAlert(new Alert(STH_ALERTCODE.duplicateText, "WARNING: Duplicate subquestion text detected."));
           }
         }
       }
