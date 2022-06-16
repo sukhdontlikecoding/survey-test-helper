@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.22.2
+// @version 2.3.0
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
