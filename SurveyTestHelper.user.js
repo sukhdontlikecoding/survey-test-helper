@@ -868,7 +868,7 @@ let SurveyTestHelper = {
     dropdownElements[r].selected = true;
   },
   inputHeatmap: function () {
-    let range = this.questionContainer.createRange();
+    let range = document.createRange();
     let heatmap = this.questionContainer.querySelector("#contentHeatMap");
     let content = heatmap.childNodes[0];
 
