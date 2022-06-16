@@ -509,6 +509,7 @@ let SurveyTestHelper = {
       || questionText.includes("select")
       || questionText.includes("pick")
       || questionText.includes("which ")
+      || questionText.includes("what ")
       || questionText.includes(" up to")) {
       if (questionText.includes(" two") || questionText.includes(" 2")) {
         context = Q_MC_CONTEXT.two;
