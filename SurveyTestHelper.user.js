@@ -103,20 +103,31 @@ let SurveyTestHelper = {
     console.log("Initializing...");
 
     this.addErrorAlertListener();
-    this.questionCode = document.querySelector("span#QNameNumData");
-    this.questionCode = this.questionCode ? this.questionCode.dataset.code : "Main Survey Page";
-
-    this.questionType = this.getQuestionType();
     this.commands = this.queryCommands();
 
     this.initStorage();
+
     this.initUI();
 
-    // Highlight potential errors
-    this.checkMandatory();
-    this.checkDuplicateText();
+    // Iterate through all question containers
+    let qContainers = document.querySelectorAll("div.question-container");
+    if (qContainers.length) {
+      qContainers.forEach(qContainer => {
+        this.questionContainer = qContainer;  // Reference to current questions container for other functions to access
+        this.questionType = this.getQuestionType(qContainer);
+        this.questionCode = qContainer.querySelector("span#QNameNumData");
+        this.questionCode = this.questionCode ? this.questionCode.dataset.code : "Main Survey Page";
 
-    this.initQuestionInfoDisplay();
+        this.initQuestionInfoDisplay();
+
+        // Highlight potential errors
+        this.checkMandatory();
+        this.checkDuplicateText();
+      }, this);
+    } else {
+      this.questionCode = "Main Survey Page";
+      this.initQuestionInfoDisplay();
+    }
 
     // Attach handlers
     this.button.onclick = this.buttonActionHandler.bind(this);
@@ -129,7 +140,7 @@ let SurveyTestHelper = {
     }
 
     if (this.active) {
-      this.enterDummyResponse();
+      this.enterDummyResponses();
       this.clickNextButton();
     }
   },
@@ -187,8 +198,6 @@ let SurveyTestHelper = {
   },
   initQuestionInfoDisplay: function () {
     let qCodeDisplay = document.createElement("div");
-    let qContainer = document.querySelector("div.question-container");
-
     let mainSurveyPageLink = document.createElement("a");
 
     // The big orange button is a link to a relevant page in a new tab
@@ -233,19 +242,18 @@ let SurveyTestHelper = {
     });
 
     // Position and further style big button if needed
-    let lastAnsElement = document.querySelector("input#lastanswer");
+    // sgqCode is of the format {SurveyID}X{GroupID}X{QuestionID}
+    let sgqCode = this.questionContainer ? this.questionContainer.querySelector('input,textarea').name.replace("MULTI","").split("X") : undefined;
 
-    if (qContainer && lastAnsElement) {
+    if (this.questionContainer && sgqCode.length) {
       // In question, attach the question code display to the top of the question container
       // Link the big orange button to the question edit page
-      // sgqCode is of the format {SurveyID}X{GroupID}X{QuestionID}
-      let sgqCode = lastAnsElement.value.split("X");
       mainSurveyPageLink.href = window.location.origin +
         "/index.php" + (window.location.search.startsWith("?r=") ? "?r=" : "/") +
         "admin/questions/sa/view/surveyid/" + sgqCode[0] +
         "/gid/" + sgqCode[1] +
         "/qid/" + sgqCode[2];
-      qContainer.appendChild(mainSurveyPageLink);
+      this.questionContainer.appendChild(mainSurveyPageLink);
     } else {
       // Not in question, attach the question code display to the top of the UI container
       // Link the big orange button to the main survey page
@@ -410,7 +418,7 @@ let SurveyTestHelper = {
         this.handleKeyDown(e.keyCode);
         break;
       case "click":
-        this.enterDummyResponse();
+        this.enterDummyResponses();
         this.clickNextButton();
         break;
       default:
@@ -425,7 +433,7 @@ let SurveyTestHelper = {
     } else {
       switch (keyCode) {
         case BUTTON_CODES.right:
-          this.enterDummyResponse();
+          this.enterDummyResponses();
           // Fallthrough
         case BUTTON_CODES.enter:
           this.clickNextButton();
@@ -438,7 +446,7 @@ let SurveyTestHelper = {
           this.toggleActive();
           break;
         case BUTTON_CODES.insert:
-          this.enterDummyResponse();
+          this.enterDummyResponses(true);
           break;
         case BUTTON_CODES.esc:
           this.toggleUI();
@@ -446,11 +454,9 @@ let SurveyTestHelper = {
       }
     }
   },
-  getQuestionType: function () {
-    let containerClasses = document.querySelector("form#limesurvey div.question-container");
-    if (containerClasses) {
-      containerClasses = containerClasses.classList;
-
+  getQuestionType: function (container) {
+    if (container) {
+      let containerClasses = container.classList;
       for (const typeName in QUESTION_CLASSES) {
         if (containerClasses.contains(typeName)) {
           console.log(typeName + " detected.");
@@ -462,7 +468,7 @@ let SurveyTestHelper = {
   },
   getNumericContext: function () {
     // Return a context enumeration based on what the question text contains
-    let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
+    let questionText = this.questionContainer.querySelector("div.question-text").innerText.toLowerCase();
     let context = null;
 
     if (questionText.includes("percent")) {
@@ -496,7 +502,7 @@ let SurveyTestHelper = {
   },
   getMCContext: function () {
     // Return a context enumeration based on what the question text contains
-    let questionText = document.querySelector("div.question-text").innerText.toLowerCase();
+    let questionText = this.questionContainer.querySelector("div.question-text").innerText.toLowerCase();
     let context = null;
 
     if (questionText.includes("choos")
@@ -539,37 +545,48 @@ let SurveyTestHelper = {
       }
     });
   },
-  enterDummyResponse: function () {
-    switch (this.questionType) {
-      case QUESTION_TYPE.radio:
-        this.inputRadio();
-        break;
-      case QUESTION_TYPE.numericInput:
-        this.inputNumericValue();
-        break;
-      case QUESTION_TYPE.shortFreeText:
-        this.inputSFTValue();
-        break;
-      case QUESTION_TYPE.array:
-        this.inputArrayOptions();
-        break;
-      case QUESTION_TYPE.multipleChoice:
-        this.inputMultipleChoiceOptions();
-        break;
-      case QUESTION_TYPE.dropdown:
-        this.inputDropdown();
-        break;
-      case QUESTION_TYPE.longFreeText:
-        this.inputLFTValue();
-        break;
-      case QUESTION_TYPE.multipleShortFreeText:
-        this.inputMSFTValue();
-        break;
-      case QUESTION_TYPE.textHuge:
-        this.inputHeatmap();
-        break;
-      default:
-        console.log("Handleable question type not found.");
+  enterDummyResponses: function (overwrite = false) {
+    let qContainers = document.querySelectorAll("div.question-container");
+    if (qContainers.length) {
+      qContainers.forEach(qContainer => {
+        this.questionContainer = qContainer;  // Reference to current questions container for other functions to access
+        this.questionType = this.getQuestionType(qContainer);
+        this.questionCode = qContainer.querySelector("span#QNameNumData");
+        this.questionCode = this.questionCode ? this.questionCode.dataset.code : undefined;
+        if (!this.isAnswered() || overwrite) {
+        switch (this.questionType) {
+          case QUESTION_TYPE.radio:
+            this.inputRadio();
+            break;
+          case QUESTION_TYPE.numericInput:
+            this.inputNumericValue();
+            break;
+          case QUESTION_TYPE.shortFreeText:
+            this.inputSFTValue();
+            break;
+          case QUESTION_TYPE.array:
+            this.inputArrayOptions();
+            break;
+          case QUESTION_TYPE.multipleChoice:
+            this.inputMultipleChoiceOptions();
+            break;
+          case QUESTION_TYPE.dropdown:
+            this.inputDropdown();
+            break;
+          case QUESTION_TYPE.longFreeText:
+            this.inputLFTValue();
+            break;
+          case QUESTION_TYPE.multipleShortFreeText:
+            this.inputMSFTValue();
+            break;
+          case QUESTION_TYPE.textHuge:
+            this.inputHeatmap();
+            break;
+          default:
+            console.log("Handleable question type not found.");
+          }
+        }
+      }, this);
     }
   },
   clearResponses: function () {
@@ -583,8 +600,8 @@ let SurveyTestHelper = {
     }
   },
   inputRadio: function () {
-    let ansList = document.querySelectorAll("div.answers-list > div.answer-item");
-    let ansInputList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
+    let ansList = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item");
+    let ansInputList = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item input.radio");
     let r = roll(0, ansInputList.length);
     let forced = false;
 
@@ -648,7 +665,7 @@ let SurveyTestHelper = {
     }
   },
   clearRadio: function () {
-    let ansList = document.querySelectorAll("div.answers-list>div.answer-item");
+    let ansList = this.questionContainer.querySelectorAll("div.answers-list>div.answer-item");
     let ans;
     for (let i = 0; i < ansList.length; i++) {
       ans = ansList.item(i).querySelector("input.radio");
@@ -664,7 +681,7 @@ let SurveyTestHelper = {
   },
   inputNumericValue: function () {
     let inputVal = 0;
-    let inputElement = document.querySelector("div.question-container input.numeric");
+    let inputElement = this.questionContainer.querySelector("input.numeric");
 
     if (this.commands.force && this.commands.force[this.questionCode]) {
       // Select from one of the comma separated values, if it's a range it should have a '-' in it
@@ -704,7 +721,7 @@ let SurveyTestHelper = {
     inputElement.value = inputVal;
   },
   inputSFTValue: function () {
-    let inputElement = document.querySelector("div.question-container input.text");
+    let inputElement = this.questionContainer.querySelector("input.text");
 
     if (this.commands.force && this.commands.force[this.questionCode]) {
       let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
@@ -716,7 +733,7 @@ let SurveyTestHelper = {
     }
   },
   inputMSFTValue: function () {
-    let inputElement = document.querySelectorAll("div.question-container input.text");
+    let inputElement = this.questionContainer.querySelectorAll("input.text");
 
     inputElement.forEach(e => {
       // Only set the value if there is nothing already in
@@ -726,7 +743,7 @@ let SurveyTestHelper = {
     });
   },
   inputLFTValue: function () {
-    let inputElement = document.querySelector("div.question-container textarea");
+    let inputElement = this.questionContainer.querySelector("div.question-container textarea");
 
     if (this.commands.force && this.commands.force[this.questionCode]) {
       let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
@@ -738,7 +755,7 @@ let SurveyTestHelper = {
     }
   },
   inputArrayOptions: function () {
-    let arrayTable = document.querySelector("table.questions-list");
+    let arrayTable = this.questionContainer.querySelector("table.questions-list");
     let rows = arrayTable.querySelectorAll(".answers-list");
     let options, r;
     rows.forEach(row => {
@@ -750,7 +767,7 @@ let SurveyTestHelper = {
     });
   },
   inputMultipleChoiceOptions: function () {
-    let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
+    let checkboxes = this.questionContainer.querySelectorAll("div.questions-list div.answer-item input.checkbox");
     let context = this.getMCContext();
     let numToCheck = roll(2, context ? context : Math.ceil(checkboxes.length / 3));
     let toBeChecked = [];
@@ -759,15 +776,10 @@ let SurveyTestHelper = {
     let restrictedVals = [];
     let rollAttempts = 0;
 
-    let qID = document.querySelector("div.question-container").id.replace("question","");
-    let subquestionCodes = function () {
-      sqCodes = [];
-
-      document.querySelectorAll("div.questions-list > div > div.answer-item").forEach(function (e) {
-        sqCodes.push(e.id.split(qID)[1]);
-      });
-      return sqCodes;
-    }();
+    let qID = this.questionContainer.id.replace("question","");
+    let subquestionCodes = [...this.questionContainer.querySelectorAll(
+      "div.questions-list > div > div.answer-item"
+    )].map(element => element.id.split(qID)[1]);
 
     // Clear the checkboxes before re-selecting them
     this.clearMChoice();
@@ -815,7 +827,7 @@ let SurveyTestHelper = {
     }
   },
   clearMChoice: function () {
-    let checkboxes = document.querySelectorAll("div.questions-list div.answer-item input.checkbox");
+    let checkboxes = this.questionContainer.querySelectorAll("div.questions-list div.answer-item input.checkbox");
 
     checkboxes.forEach(chkbox => {
       if (chkbox.checked) {
@@ -827,7 +839,7 @@ let SurveyTestHelper = {
     });
   },
   inputDropdown: function () {
-    let dropdownElements = document.querySelector("div.question-container select.list-question-select");
+    let dropdownElements = this.questionContainer.querySelector("select.list-question-select");
     let r = roll(0, dropdownElements.length);
     let forced = false;
 
@@ -856,8 +868,8 @@ let SurveyTestHelper = {
     dropdownElements[r].selected = true;
   },
   inputHeatmap: function () {
-    let range = document.createRange();
-    let heatmap = document.querySelector("#contentHeatMap");
+    let range = this.questionContainer.createRange();
+    let heatmap = this.questionContainer.querySelector("#contentHeatMap");
     let content = heatmap.childNodes[0];
 
     range.setStart(content, 0);
@@ -900,10 +912,10 @@ let SurveyTestHelper = {
     return commandContainer;
   },
   generateArrayInfoDisplay: function () {
-    let rows = document.querySelectorAll("tbody > tr.answers-list");
-    let headerCols = document.querySelectorAll("thead th.th-9");
+    let rows = this.questionContainer.querySelectorAll("tbody > tr.answers-list");
+    let headerCols = this.questionContainer.querySelectorAll("thead th.th-9");
     let firstRowCells = rows[0].querySelectorAll("td.answer-item > input");
-    let qID = document.querySelector("div.question-container").id.replace("question","");
+    let qID = this.questionContainer.id.replace("question","");
 
     // Subquestion code display
     for (let i = 0; i < rows.length; i++) {
@@ -953,7 +965,7 @@ let SurveyTestHelper = {
     }
   },
   generateRadioInfoDisplay: function () {
-    let ansList = document.querySelectorAll("div.answers-list > div.answer-item input.radio");
+    let ansList = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item input.radio");
 
     // Answer option value display
     for (let i = 0; i < ansList.length; i++) {
@@ -982,8 +994,8 @@ let SurveyTestHelper = {
     }
   },
   generateMChoiceInfoDisplay: function () {
-    let choiceList = document.querySelectorAll("div.questions-list > div > div.answer-item");
-    let qID = document.querySelector("div.question-container").id.replace("question","");
+    let choiceList = this.questionContainer.querySelectorAll("div.questions-list > div > div.answer-item");
+    let qID = this.questionContainer.id.replace("question","");
 
     for (let i = 0; i < choiceList.length; i++) {
       let infoDiv = document.createElement("div");
@@ -1011,10 +1023,10 @@ let SurveyTestHelper = {
     }
   },
   checkMandatory: function () {
-    let mandatoryAsterisk = document.querySelector("div.question-text>span.text-danger.asterisk");
+    let mandatoryAsterisk = this.questionContainer.querySelector("div.question-text>span.text-danger.asterisk");
 
     if (this.getQuestionType() && !mandatoryAsterisk) {
-      this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory, "WARNING: Non-mandatory question detected."));
+      this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory, `WARNING: Non-mandatory question detected (${this.questionCode}).`));
     }
   },
   checkDuplicateText: function () {
@@ -1022,16 +1034,16 @@ let SurveyTestHelper = {
 
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
-        textElement = document.querySelectorAll("div.answers-list > div.answer-item");
+        textElement = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item");
         break;
       case QUESTION_TYPE.dropdown:
-        textElement = document.querySelector("div.question-container select.list-question-select");
+        textElement = this.questionContainer.querySelector("select.list-question-select");
         break;
       case QUESTION_TYPE.multipleChoice:
-        textElement = document.querySelectorAll("div.questions-list div.answer-item");
+        textElement = this.questionContainer.querySelectorAll("div.questions-list div.answer-item");
         break;
       case QUESTION_TYPE.array:
-        textElement = document.querySelectorAll("thead th.th-9");
+        textElement = this.questionContainer.querySelectorAll("thead th.th-9");
         break;
     }
 
@@ -1044,7 +1056,7 @@ let SurveyTestHelper = {
 
             this.alertBorderElements.push(textElement[i], textElement[i2]);
 
-            this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer, "WARNING: Duplicate option text detected."));
+            this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer, `WARNING: Duplicate option text detected (${this.questionCode}).`));
           }
         }
       }
@@ -1052,7 +1064,7 @@ let SurveyTestHelper = {
 
     // Check array subquestion text as well
     if (this.questionType === QUESTION_TYPE.array) {
-      textElement = document.querySelectorAll(".answertext");
+      textElement = this.questionContainer.querySelectorAll(".answertext");
 
       for (let i = 0; i < textElement.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElement.length; i2++) {
@@ -1062,12 +1074,38 @@ let SurveyTestHelper = {
 
             this.alertBorderElements.push(textElement[i], textElement[i2]);
 
-            this.addAlert(new Alert(STH_ALERTCODE.duplicateText, "WARNING: Duplicate subquestion text detected."));
+            this.addAlert(new Alert(STH_ALERTCODE.duplicateText, `WARNING: Duplicate subquestion text detected (${this.questionCode}).`));
           }
         }
       }
     }
-  }
+  },
+  isAnswered: function () {
+    let answerFound = false;
+    switch (this.questionType) {
+      case QUESTION_TYPE.radio:
+      case QUESTION_TYPE.mChoice:
+      case QUESTION_TYPE.array:
+        if(this.questionContainer.querySelector('input:checked')) {
+          answerFound = true;
+        }
+        break;
+      case QUESTION_TYPE.numericInput:
+      case QUESTION_TYPE.shortFreeText:
+      case QUESTION_TYPE.longFreeText:
+      case QUESTION_TYPE.multiShortFreeText:
+        if (this.questionContainer.querySelector('input.text, textarea').value) {
+          answerFound = true;
+        }
+        break;
+      case QUESTION_TYPE.dropdown:
+        if (this.questionContainer.querySelector('select').value) {
+          answerFound = true;
+        }
+        break;
+    }
+    return answerFound;
+  },
 };
 
 function roll (min, max) {
