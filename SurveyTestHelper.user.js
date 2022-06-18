@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.30.2
+// @version 2.30.3
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -243,7 +243,10 @@ let SurveyTestHelper = {
 
     // Position and further style big button if needed
     // sgqCode is of the format {SurveyID}X{GroupID}X{QuestionID}
-    let sgqCode = this.questionContainer ? this.questionContainer.querySelector('input,textarea').name.replace("MULTI","").split("X") : undefined;
+    let sgqCode = this.questionContainer ?
+      this.questionContainer.querySelector('input,textarea')
+      .name.replace("MULTI","").split("X") :
+      undefined;
 
     if (this.questionContainer && sgqCode.length) {
       // In question, attach the question code display to the top of the question container
@@ -252,7 +255,7 @@ let SurveyTestHelper = {
         "/index.php" + (window.location.search.startsWith("?r=") ? "?r=" : "/") +
         "admin/questions/sa/view/surveyid/" + sgqCode[0] +
         "/gid/" + sgqCode[1] +
-        "/qid/" + sgqCode[2];
+        "/qid/" + sgqCode[2].slice(0, 6);
       this.questionContainer.appendChild(mainSurveyPageLink);
     } else {
       // Not in question, attach the question code display to the top of the UI container
