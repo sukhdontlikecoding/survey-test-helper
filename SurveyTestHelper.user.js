@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.30.4
+// @version 2.30.5
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -19,7 +19,7 @@ const QUESTION_CLASSES = {
   "numeric-multi": 7,
   "text-long": 8,
   "multiple-short-txt": 9,
-  "text-huge": 10
+  "text-huge": 10,
 };
 const QUESTION_TYPE = {
   radio: 1,
@@ -31,7 +31,7 @@ const QUESTION_TYPE = {
   multipleNumericInput: 7,
   longFreeText: 8,
   multipleShortFreeText: 9,
-  textHuge: 10
+  textHuge: 10,
 };
 const BUTTON_CODES = {
   right: 39,
@@ -41,7 +41,7 @@ const BUTTON_CODES = {
   spacebar: 32,
   enter: 13,
   esc: 27,
-  insert: 45
+  insert: 45,
 };
 const Q_NUM_CONTEXT = {
   age: 1,
@@ -51,24 +51,25 @@ const Q_NUM_CONTEXT = {
   percent: 5,
   yearRef: 6,
   yearAL: 7,
-  scale: 8
+  scale: 8,
 };
 const Q_MC_CONTEXT = {
   two: 2,
   three: 3,
   four: 4,
-  five: 5
+  five: 5,
 }
 const STH_COMMANDS = [
   "avoid",
-  "force"
+  "force",
 ];
 const STH_ALERTCODE = {
   invalidAnswer: 1,
   hiddenOptionForced: 2,
   unexpectedNonMandatory: 3,
   duplicateAnswer: 4,
-  duplicateText: 5
+  duplicateText: 5,
+  noOptionsAvailable: 6,
 };
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
@@ -607,68 +608,82 @@ let SurveyTestHelper = {
     }
   },
   inputRadio: function () {
-    let ansList = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item");
     let ansInputList = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item input.radio");
-    let r = roll(0, ansInputList.length);
-    let forced = false;
+    let availableIndices = [];
 
     this.clearRadio();
 
     try {
       if (this.commands.force && this.commands.force[this.questionCode]) {
-        let forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)];
-        for (let i = 0; i < ansInputList.length; i++) {
-          if (forcedVal === ansInputList[i].value) {
-            r = i;
-            if (isHidden(ansInputList[r])) {
-              throw "ERROR: " + this.questionCode + " - option " + forcedVal +
-                " is hidden but is being used as a forced option.";
+        let forcedVals = this.commands.force[this.questionCode];
+        ansInputList.forEach((opt, i) => {
+          if (forcedVals.includes(opt.value) && !isHidden(opt)) {
+            availableIndices.push(i);
+            if (isHidden(opt)) {
+              throw {
+                message: "ERROR: " + this.questionCode + " - option [" + opt.value +
+                "] is hidden but is being used as a forced option.",
+                code: STH_ALERTCODE.hiddenOptionForced,
+              };
             }
-            break;
           }
-        }
-        forced = true;
+        });
+      } else if (this.commands.avoid && this.commands.avoid[this.questionCode]) {
+        let restrictedVals = this.commands.avoid[this.questionCode];
+        ansInputList.forEach((opt, i) => { 
+          if (!(restrictedVals.includes(opt.value) || isHidden(opt))) {
+            availableIndices.push(i);
+          }
+        });
       } else {
-        // Checks to see whether the option found is hidden or not
-        while (isHidden(ansInputList[r])) {
-          r = roll(0, ansInputList.length);
+        ansInputList.forEach((opt, i) => {
+          if (!isHidden(opt)) {
+            availableIndices.push(i);
+          }
+        });
+      }
+
+      let selectedIndex;
+
+      // List of options compiled, select one if available
+      if (availableIndices.length > 0) {
+        selectedIndex = availableIndices[roll(0, availableIndices.length)];
+      } else {  // No options available
+        throw {
+          message: "ERROR: " + this.questionCode +
+          " does not have any options available for selection.",
+          code: STH_ALERTCODE.noOptionsAvailable,
+        }
+      }
+
+      ansInputList.item(selectedIndex).checked = true;
+      let otherOpt = ansInputList.item(selectedIndex).closest(".answer-item").querySelector("input.text");
+      if (otherOpt) {
+        let context = this.getNumericContext();
+        switch (context) {
+          case Q_NUM_CONTEXT.age:
+          case Q_NUM_CONTEXT.percent:
+            otherOpt.value = roll(18, 99);
+            break;
+          case Q_NUM_CONTEXT.year:
+            otherOpt.value = roll(1910, validAgeYear);
+            break;
+          case Q_NUM_CONTEXT.zipCode:
+            otherOpt.value = "90210";
+            break;
+          case Q_NUM_CONTEXT.quantity:
+            otherOpt.value = roll(0, 20);
+            break;
+          case Q_NUM_CONTEXT.scale:
+            otherOpt.value = roll(40, 100);
+            break;
+          default:  // Generic string response
+            otherOpt.value = "Run at: " + getTimeStamp();
         }
       }
     }
     catch (e) {
-      this.addAlert(new Alert(STH_ALERTCODE.hiddenOptionForced, e));
-    }
-    if (!forced && this.commands.avoid && this.commands.avoid[this.questionCode]) {
-      let restrictedVals = this.commands.avoid[this.questionCode];
-      while (restrictedVals.includes(ansInputList[r].value) || isHidden(ansInputList[r])) {
-        r = roll(0, ansInputList.length);
-      }
-    }
-
-    ansList.item(r).querySelector("input.radio").checked = true;
-    let otherOpt = ansList.item(r).querySelector("input.text");
-    if (otherOpt) {
-      let context = this.getNumericContext();
-      switch (context) {
-        case Q_NUM_CONTEXT.age:
-        case Q_NUM_CONTEXT.percent:
-          otherOpt.value = roll(18, 99);
-          break;
-        case Q_NUM_CONTEXT.year:
-          otherOpt.value = roll(1910, validAgeYear);
-          break;
-        case Q_NUM_CONTEXT.zipCode:
-          otherOpt.value = "90210";
-          break;
-        case Q_NUM_CONTEXT.quantity:
-          otherOpt.value = roll(0, 20);
-          break;
-        case Q_NUM_CONTEXT.scale:
-          otherOpt.value = roll(40, 100);
-          break;
-        default:  // Generic string response
-          otherOpt.value = "Run at: " + getTimeStamp();
-      }
+      this.addAlert(new Alert(e.code, e.message));
     }
   },
   clearRadio: function () {
