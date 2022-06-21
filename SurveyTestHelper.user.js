@@ -554,41 +554,43 @@ let SurveyTestHelper = {
     let qContainers = document.querySelectorAll("div.question-container");
     if (qContainers.length) {
       qContainers.forEach(qContainer => {
-        this.questionContainer = qContainer;  // Reference to current questions container for other functions to access
-        this.questionType = this.getQuestionType(qContainer);
-        this.questionCode = qContainer.querySelector("span#QNameNumData");
-        this.questionCode = this.questionCode ? this.questionCode.dataset.code : undefined;
-        if (!this.isAnswered() || overwrite) {
-        switch (this.questionType) {
-          case QUESTION_TYPE.radio:
-            this.inputRadio();
-            break;
-          case QUESTION_TYPE.numericInput:
-            this.inputNumericValue();
-            break;
-          case QUESTION_TYPE.shortFreeText:
-            this.inputSFTValue();
-            break;
-          case QUESTION_TYPE.array:
-            this.inputArrayOptions();
-            break;
-          case QUESTION_TYPE.multipleChoice:
-            this.inputMultipleChoiceOptions();
-            break;
-          case QUESTION_TYPE.dropdown:
-            this.inputDropdown();
-            break;
-          case QUESTION_TYPE.longFreeText:
-            this.inputLFTValue();
-            break;
-          case QUESTION_TYPE.multipleShortFreeText:
-            this.inputMSFTValue();
-            break;
-          case QUESTION_TYPE.textHuge:
-            this.inputHeatmap();
-            break;
-          default:
-            console.log("Handleable question type not found.");
+        if (!isHidden(qContainer)) {
+          this.questionContainer = qContainer;  // Reference to current questions container for other functions to access
+          this.questionType = this.getQuestionType(qContainer);
+          this.questionCode = qContainer.querySelector("span#QNameNumData");
+          this.questionCode = this.questionCode ? this.questionCode.dataset.code : undefined;
+          if (!this.isAnswered() || overwrite) {
+          switch (this.questionType) {
+            case QUESTION_TYPE.radio:
+              this.inputRadio();
+              break;
+            case QUESTION_TYPE.numericInput:
+              this.inputNumericValue();
+              break;
+            case QUESTION_TYPE.shortFreeText:
+              this.inputSFTValue();
+              break;
+            case QUESTION_TYPE.array:
+              this.inputArrayOptions();
+              break;
+            case QUESTION_TYPE.multipleChoice:
+              this.inputMultipleChoiceOptions();
+              break;
+            case QUESTION_TYPE.dropdown:
+              this.inputDropdown();
+              break;
+            case QUESTION_TYPE.longFreeText:
+              this.inputLFTValue();
+              break;
+            case QUESTION_TYPE.multipleShortFreeText:
+              this.inputMSFTValue();
+              break;
+            case QUESTION_TYPE.textHuge:
+              this.inputHeatmap();
+              break;
+            default:
+              console.log("Handleable question type not found.");
+            }
           }
         }
       }, this);
