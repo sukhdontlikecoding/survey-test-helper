@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.30.5
+// @version 2.30.6
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -119,11 +119,11 @@ let SurveyTestHelper = {
         this.questionCode = qContainer.querySelector("span#QNameNumData");
         this.questionCode = this.questionCode ? this.questionCode.dataset.code : "Main Survey Page";
 
-        this.initQuestionInfoDisplay();
-
         // Highlight potential errors
         this.checkMandatory();
         this.checkDuplicateText();
+
+        this.initQuestionInfoDisplay();
       }, this);
     } else {
       this.questionCode = "Main Survey Page";
@@ -630,7 +630,7 @@ let SurveyTestHelper = {
         });
       } else if (this.commands.avoid && this.commands.avoid[this.questionCode]) {
         let restrictedVals = this.commands.avoid[this.questionCode];
-        ansInputList.forEach((opt, i) => { 
+        ansInputList.forEach((opt, i) => {
           if (!(restrictedVals.includes(opt.value) || isHidden(opt))) {
             availableIndices.push(i);
           }
