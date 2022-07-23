@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.30.6
+// @version 2.30.7
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -459,7 +459,7 @@ let SurveyTestHelper = {
       }
     }
   },
-  getQuestionType: function (container) {
+  getQuestionType: function (container = this.questionContainer) {
     if (container) {
       let containerClasses = container.classList;
       for (const typeName in QUESTION_CLASSES) {
