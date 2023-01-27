@@ -72,6 +72,7 @@ const STH_ALERTCODE = {
   noOptionsAvailable: 6,
   missingScaleOption: 7,
   scaleTextMismatch: 8,
+  numberOnlyTextValueMismatch: 9,
 };
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
@@ -125,6 +126,7 @@ let SurveyTestHelper = {
         this.checkMandatory();
         this.checkDuplicateText();
         this.checkScaleOptions();
+        this.checkNumberOnlyValue();
 
         this.initQuestionInfoDisplay();
       }, this);
@@ -1017,7 +1019,6 @@ let SurveyTestHelper = {
       let infoDiv = document.createElement("div");
 
       infoDiv.dataset.opacity = infoDisplayOpacity;
-
       infoDiv.innerHTML = ansList[i].value;
       infoDiv.style.position = "absolute";
       infoDiv.style.top = "-0.3em";
@@ -1165,14 +1166,49 @@ let SurveyTestHelper = {
       }
       if (missing.length > 0) {
         this.addAlert(new Alert(STH_ALERTCODE.missingScaleOption,
-          `WARNING: Scale options missing (<span style="color:darkred;">${missing}</span>).`));
+          `WARNING: Scale option${missing.length > 1 ? 's' : ''} missing (<span style="color:darkred;">${missing}</span>).`));
       }
       if (missingQTextNumbers && missingQTextNumbers.length > 0) {
         this.addAlert(new Alert(STH_ALERTCODE.scaleTextMismatch,
-          `WARNING: Scale values referenced in question text missing (<span style="color:darkred;">${missingQTextNumbers}</span>).`));
+          `WARNING: Scale value${missingQTextNumbers.length > 1 ? 's' : ''} referenced in question text missing (<span style="color:darkred;">${missingQTextNumbers}</span>).`));
       }
     }
-  }
+  },
+  checkNumberOnlyValue: function () {
+    let textElements = this.getAnswerOptionTextElements();
+    let numOnly = /^[0-9]+$/;
+    let errorElements = [];
+
+    switch (this.questionType) {
+      case QUESTION_TYPE.radio:
+        textElements.forEach(e => {
+          let text = e.innerText;
+          let value = e.querySelector('input.radio').value;
+
+          if (numOnly.test(text) && Number(text) !== Number(value)) {
+            this.alertBorderElements.push(e);
+            e.style.border = "dashed 3px red";
+            this.addAlert(new Alert(STH_ALERTCODE.numberOnlyTextValueMismatch,
+              `WARNING: Number only answer option does not match its code.`));
+          }
+        });
+        break;
+      case QUESTION_TYPE.array:
+        let firstRowCells = this.questionContainer.querySelector("tbody > tr.answers-list")
+          .querySelectorAll("td.answer-item > input");
+        textElements.forEach((e, i) => {
+          let text = e.innerText;
+          let value = firstRowCells[i].value;
+          if (numOnly.test(text) && Number(text) !== Number(value)) {
+            this.alertBorderElements.push(e);
+            e.style.border = "dashed 3px red";
+            this.addAlert(new Alert(STH_ALERTCODE.numberOnlyTextValueMismatch,
+              `WARNING: Number only answer option does not match its code.`));
+          }
+        });
+        break;
+    }
+  },
 };
 
 function roll (min, max) {
