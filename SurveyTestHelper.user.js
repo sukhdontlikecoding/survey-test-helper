@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.30.7
+// @version 2.30.8
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -70,6 +70,8 @@ const STH_ALERTCODE = {
   duplicateAnswer: 4,
   duplicateText: 5,
   noOptionsAvailable: 6,
+  missingScaleOption: 7,
+  scaleTextMismatch: 8,
 };
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
@@ -122,6 +124,7 @@ let SurveyTestHelper = {
         // Highlight potential errors
         this.checkMandatory();
         this.checkDuplicateText();
+        this.checkScaleOptions();
 
         this.initQuestionInfoDisplay();
       }, this);
@@ -469,11 +472,31 @@ let SurveyTestHelper = {
         }
       }
     }
-    return undefined;
+    return null;
+  },
+  getQuestionText: function (container = this.questionContainer) {
+    if (container) {
+      return container.querySelector("div.question-text").innerText;
+    }
+    return null;
+  },
+  getAnswerOptionTextElements: function () {
+    switch (this.questionType) {
+      case QUESTION_TYPE.radio:
+        return this.questionContainer.querySelectorAll("div.answers-list > div.answer-item");
+      case QUESTION_TYPE.dropdown:
+        return this.questionContainer.querySelector("select.list-question-select");
+      case QUESTION_TYPE.multipleChoice:
+        return this.questionContainer.querySelectorAll("div.questions-list div.answer-item");
+      case QUESTION_TYPE.array:
+        return this.questionContainer.querySelectorAll("thead th.th-9");
+      default:
+        return null;
+    }
   },
   getNumericContext: function () {
     // Return a context enumeration based on what the question text contains
-    let questionText = this.questionContainer.querySelector("div.question-text").innerText.toLowerCase();
+    let questionText = this.getQuestionText().toLowerCase();
     let context = null;
 
     if (questionText.includes("percent")) {
@@ -1048,37 +1071,24 @@ let SurveyTestHelper = {
     let mandatoryAsterisk = this.questionContainer.querySelector("div.question-text>span.text-danger.asterisk");
 
     if (this.getQuestionType() && !mandatoryAsterisk) {
-      this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory, `WARNING: Non-mandatory question detected (${this.questionCode}).`));
+      this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory,
+        `WARNING: Non-mandatory question detected (<span style="color:darkred;">${this.questionCode}</span>).`));
     }
   },
   checkDuplicateText: function () {
-    let textElement = null;
+    let textElements = this.getAnswerOptionTextElements();
 
-    switch (this.questionType) {
-      case QUESTION_TYPE.radio:
-        textElement = this.questionContainer.querySelectorAll("div.answers-list > div.answer-item");
-        break;
-      case QUESTION_TYPE.dropdown:
-        textElement = this.questionContainer.querySelector("select.list-question-select");
-        break;
-      case QUESTION_TYPE.multipleChoice:
-        textElement = this.questionContainer.querySelectorAll("div.questions-list div.answer-item");
-        break;
-      case QUESTION_TYPE.array:
-        textElement = this.questionContainer.querySelectorAll("thead th.th-9");
-        break;
-    }
+    if (textElements) {
+      for (let i = 0; i < textElements.length - 1; i++) {
+        for (let i2 = i + 1; i2 < textElements.length; i2++) {
+          if (textElements[i].innerText.trim() == textElements[i2].innerText.trim()) {
+            textElements[i].style.border = "dashed 3px red";
+            textElements[i2].style.border = "dashed 3px red";
 
-    if (textElement) {
-      for (let i = 0; i < textElement.length - 1; i++) {
-        for (let i2 = i + 1; i2 < textElement.length; i2++) {
-          if (textElement[i].innerText.trim() == textElement[i2].innerText.trim()) {
-            textElement[i].style.border = "dashed 3px red";
-            textElement[i2].style.border = "dashed 3px red";
+            this.alertBorderElements.push(textElements[i], textElements[i2]);
 
-            this.alertBorderElements.push(textElement[i], textElement[i2]);
-
-            this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer, `WARNING: Duplicate option text detected (${this.questionCode}).`));
+            this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer,
+              `WARNING: Duplicate option text detected (<span style="color:darkred;">${this.questionCode}</span>).`));
           }
         }
       }
@@ -1086,17 +1096,18 @@ let SurveyTestHelper = {
 
     // Check array subquestion text as well
     if (this.questionType === QUESTION_TYPE.array) {
-      textElement = this.questionContainer.querySelectorAll(".answertext");
+      textElements = this.questionContainer.querySelectorAll(".answertext");
 
-      for (let i = 0; i < textElement.length - 1; i++) {
-        for (let i2 = i + 1; i2 < textElement.length; i2++) {
-          if (textElement[i].innerText.trim() == textElement[i2].innerText.trim()) {
-            textElement[i].style.border = "dashed 3px red";
-            textElement[i2].style.border = "dashed 3px red";
+      for (let i = 0; i < textElements.length - 1; i++) {
+        for (let i2 = i + 1; i2 < textElements.length; i2++) {
+          if (textElements[i].innerText.trim() == textElements[i2].innerText.trim()) {
+            textElements[i].style.border = "dashed 3px red";
+            textElements[i2].style.border = "dashed 3px red";
 
-            this.alertBorderElements.push(textElement[i], textElement[i2]);
+            this.alertBorderElements.push(textElements[i], textElements[i2]);
 
-            this.addAlert(new Alert(STH_ALERTCODE.duplicateText, `WARNING: Duplicate subquestion text detected (${this.questionCode}).`));
+            this.addAlert(new Alert(STH_ALERTCODE.duplicateText,
+              `WARNING: Duplicate subquestion text detected (<span style="color:darkred;">${this.questionCode}</span>).`));
           }
         }
       }
@@ -1128,6 +1139,40 @@ let SurveyTestHelper = {
     }
     return answerFound;
   },
+  checkScaleOptions: function () {
+    if (this.getNumericContext() === Q_NUM_CONTEXT.scale &&
+      (this.questionType === QUESTION_TYPE.radio || this.questionType === QUESTION_TYPE.array)) {
+      let optionNumbers = [];
+      let missingQTextNumbers = this.getQuestionText().match(/[0-9]+/g);
+      let missing = [];
+      let max = 0;
+      this.getAnswerOptionTextElements().forEach(e => {
+        let num = e.innerText.match(/[0-9]+/);
+        if (num && num.length > 0) {
+          optionNumbers.push(Number(num[0]));
+        }
+      });
+      if (missingQTextNumbers) {
+        missingQTextNumbers = missingQTextNumbers.map(n => Number(n)).filter(n => (n <= 10 && !optionNumbers.includes(n)));
+        max = optionNumbers.at(-1) > missingQTextNumbers.at(-1) ?
+          optionNumbers.at(-1) : missingQTextNumbers.at(-1);
+      }
+      max = max > 0 ? max : optionNumbers.at(-1);
+      for (let i = 1; i < max + 1; i++) {
+        if (!optionNumbers.includes(i)) {
+          missing.push(i);
+        }
+      }
+      if (missing.length > 0) {
+        this.addAlert(new Alert(STH_ALERTCODE.missingScaleOption,
+          `WARNING: Scale options missing (<span style="color:darkred;">${missing}</span>).`));
+      }
+      if (missingQTextNumbers && missingQTextNumbers.length > 0) {
+        this.addAlert(new Alert(STH_ALERTCODE.scaleTextMismatch,
+          `WARNING: Scale values referenced in question text missing (<span style="color:darkred;">${missingQTextNumbers}</span>).`));
+      }
+    }
+  }
 };
 
 function roll (min, max) {
