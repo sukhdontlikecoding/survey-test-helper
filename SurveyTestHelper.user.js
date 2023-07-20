@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
-// @version 2.30.8
+// @author  Elliot Kwan
+// @version 2.32.2
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -73,14 +74,33 @@ const STH_ALERTCODE = {
   missingScaleOption: 7,
   scaleTextMismatch: 8,
   numberOnlyTextValueMismatch: 9,
+  questionTextKeywordNotFound: 10,
 };
+//Patterns that should be in both Q and A, if in Q
+const QUESTION_TEXT_KEYWORDS = [
+  "favor",
+  "unfavor",
+  "support",
+  "oppose",
+  "more likely",
+  "less likely",
+  "strongly",
+  "somewhat",
+  "definitely",
+  "probably",
+  "concern",
+  "agree",
+  "disagree",
+];
+const DEFAULT_ZIP = 90210;
+const ERROR_BORDER_STYLE = "red dashed 3px";
 const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
 const COMMAND_OBJ_NAME = "STH_commands";
 const STH_HIDDEN = "STH_hidden";
 
 class Alert {
-  constructor(code = 0, message = "Generic Alert Message") {
+  constructor(code = 0, message = "Unknown alert. Keep an eye out.") {
     this.code = code;
     this.message = message;
   }
@@ -126,6 +146,7 @@ let SurveyTestHelper = {
         this.checkMandatory();
         this.checkDuplicateText();
         this.checkScaleOptions();
+        this.checkQuestionAnswerTextMatch();
         this.checkNumberOnlyValue();
 
         this.initQuestionInfoDisplay();
@@ -141,7 +162,7 @@ let SurveyTestHelper = {
 
     document.body.appendChild(this.uiContainer);
 
-    if(document.querySelector("button#movenextbtn")){
+    if(document.querySelector("button#movenextbtn") && !this.hidden){
       document.querySelector("button#movenextbtn").disabled = false;
     }
 
@@ -335,6 +356,13 @@ let SurveyTestHelper = {
     this.alerts.push(alert);
 
     this.displayAlerts();
+  },
+  addAlertBorderElements: function () {
+    for (let i = 0; i < arguments.length; i++) {
+      if (!this.alertBorderElements.includes(arguments[i])) {
+        this.alertBorderElements.push(arguments[i]);
+      }
+    }
   },
   displayAlerts: function () {
     window.setTimeout (function () {
@@ -532,7 +560,7 @@ let SurveyTestHelper = {
   },
   getMCContext: function () {
     // Return a context enumeration based on what the question text contains
-    let questionText = this.questionContainer.querySelector("div.question-text").innerText.toLowerCase();
+    let questionText = this.getQuestionText().toLowerCase();
     let context = null;
 
     if (questionText.includes("choos")
@@ -614,6 +642,9 @@ let SurveyTestHelper = {
             case QUESTION_TYPE.textHuge:
               this.inputHeatmap();
               break;
+            case QUESTION_TYPE.multipleNumericInput:
+              this.inputMultipleNumericValue();
+              break;
             default:
               console.log("Handleable question type not found.");
             }
@@ -694,7 +725,7 @@ let SurveyTestHelper = {
             otherOpt.value = roll(1910, validAgeYear);
             break;
           case Q_NUM_CONTEXT.zipCode:
-            otherOpt.value = "90210";
+            otherOpt.value = DEFAULT_ZIP;
             break;
           case Q_NUM_CONTEXT.quantity:
             otherOpt.value = roll(0, 20);
@@ -729,6 +760,7 @@ let SurveyTestHelper = {
   inputNumericValue: function () {
     let inputVal = 0;
     let inputElement = this.questionContainer.querySelector("input.numeric");
+    let context = this.getNumericContext();
 
     if (this.commands.force && this.commands.force[this.questionCode]) {
       // Select from one of the comma separated values, if it's a range it should have a '-' in it
@@ -740,7 +772,6 @@ let SurveyTestHelper = {
         inputVal = forcedVal[0];
       }
     } else {
-      let context = this.getNumericContext();
       switch (context) {
         case Q_NUM_CONTEXT.age:
         case Q_NUM_CONTEXT.percent:
@@ -750,7 +781,7 @@ let SurveyTestHelper = {
           inputVal = generateNumericInput(1910, validAgeYear);
           break;
         case Q_NUM_CONTEXT.zipCode:
-          inputVal = 90210;
+          inputVal = DEFAULT_ZIP;
           break;
         case Q_NUM_CONTEXT.yearRef:
           // Year except with a refused option
@@ -766,6 +797,49 @@ let SurveyTestHelper = {
     }
 
     inputElement.value = inputVal;
+  },
+  inputMultipleNumericValue: function () {
+    let inputVal = 0;
+    let inputElements = this.questionContainer.querySelectorAll("input.numeric");
+
+    let forcedVal;
+    let context = this.getNumericContext();
+    for (let i = 0; i < inputElements.length; i++) {
+      if (this.commands.force && this.commands.force[this.questionCode]) {
+        // Select from one of the comma separated values, if it's a range it should have a '-' in it
+        forcedVal = this.commands.force[this.questionCode][roll(0, this.commands.force[this.questionCode].length)].split("-");
+        if (forcedVal.length > 1) {
+          forcedVal = roll(Number(forcedVal[0]), Number(forcedVal[1]) + 1);
+          inputVal = forcedVal;
+        } else {
+          inputVal = forcedVal[0];
+        }
+      } else {
+        switch (context) {
+          case Q_NUM_CONTEXT.age:
+          case Q_NUM_CONTEXT.percent:
+            inputVal = "0" + generateNumericInput(18, 99).toString();
+            break;
+          case Q_NUM_CONTEXT.year:
+            inputVal = generateNumericInput(1910, validAgeYear);
+            break;
+          case Q_NUM_CONTEXT.zipCode:
+            inputVal = DEFAULT_ZIP;
+            break;
+          case Q_NUM_CONTEXT.yearRef:
+            // Year except with a refused option
+            inputVal = generateNumericInput(1910, validAgeYear, 9999);
+            break;
+          case Q_NUM_CONTEXT.yearAL:
+            // Client-specific year w/ refused option
+            inputVal = generateNumericInput(1910, validAgeYear, 0);
+            break;
+          default:  // Probably a quantity or something
+            inputVal = roll(0, 20);
+        }
+      }
+      inputElements[i].value = inputVal;
+    }
   },
   inputSFTValue: function () {
     let inputElement = this.questionContainer.querySelector("input.text");
@@ -1083,10 +1157,10 @@ let SurveyTestHelper = {
       for (let i = 0; i < textElements.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElements.length; i2++) {
           if (textElements[i].innerText.trim() == textElements[i2].innerText.trim()) {
-            textElements[i].style.border = "dashed 3px red";
-            textElements[i2].style.border = "dashed 3px red";
+            textElements[i].style.border = ERROR_BORDER_STYLE;
+            textElements[i2].style.border = ERROR_BORDER_STYLE;
 
-            this.alertBorderElements.push(textElements[i], textElements[i2]);
+            this.addAlertBorderElements(textElements[i], textElements[i2]);
 
             this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer,
               `WARNING: Duplicate option text detected (<span style="color:darkred;">${this.questionCode}</span>).`));
@@ -1102,10 +1176,10 @@ let SurveyTestHelper = {
       for (let i = 0; i < textElements.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElements.length; i2++) {
           if (textElements[i].innerText.trim() == textElements[i2].innerText.trim()) {
-            textElements[i].style.border = "dashed 3px red";
-            textElements[i2].style.border = "dashed 3px red";
+            textElements[i].style.border = ERROR_BORDER_STYLE;
+            textElements[i2].style.border = ERROR_BORDER_STYLE;
 
-            this.alertBorderElements.push(textElements[i], textElements[i2]);
+            this.addAlertBorderElements(textElements[i], textElements[i2]);
 
             this.addAlert(new Alert(STH_ALERTCODE.duplicateText,
               `WARNING: Duplicate subquestion text detected (<span style="color:darkred;">${this.questionCode}</span>).`));
@@ -1177,7 +1251,6 @@ let SurveyTestHelper = {
   checkNumberOnlyValue: function () {
     let textElements = this.getAnswerOptionTextElements();
     let numOnly = /^[0-9]+$/;
-    let errorElements = [];
 
     switch (this.questionType) {
       case QUESTION_TYPE.radio:
@@ -1186,10 +1259,10 @@ let SurveyTestHelper = {
           let value = e.querySelector('input.radio').value;
 
           if (numOnly.test(text) && Number(text) !== Number(value)) {
-            this.alertBorderElements.push(e);
-            e.style.border = "dashed 3px red";
+            this.addAlertBorderElements(e);
+            e.style.border = ERROR_BORDER_STYLE;
             this.addAlert(new Alert(STH_ALERTCODE.numberOnlyTextValueMismatch,
-              `WARNING: Number only answer option does not match its code.`));
+              `WARNING: Numeric answer option does not match its code.`));
           }
         });
         break;
@@ -1200,14 +1273,54 @@ let SurveyTestHelper = {
           let text = e.innerText;
           let value = firstRowCells[i].value;
           if (numOnly.test(text) && Number(text) !== Number(value)) {
-            this.alertBorderElements.push(e);
-            e.style.border = "dashed 3px red";
+            this.addAlertBorderElements(e);
+            e.style.border = ERROR_BORDER_STYLE;
             this.addAlert(new Alert(STH_ALERTCODE.numberOnlyTextValueMismatch,
-              `WARNING: Number only answer option does not match its code.`));
+              `WARNING: Numeric answer option does not match its code.`));
           }
         });
         break;
     }
+  },
+  checkQuestionAnswerTextMatch: function () {
+    let questionText = this.getQuestionText().toLowerCase();
+    let textElements = this.getAnswerOptionTextElements();
+    let keywords = [];
+
+    if (!textElements) {
+      return;
+    }
+
+    QUESTION_TEXT_KEYWORDS.forEach((keyword) => {
+      if (questionText.includes(keyword)) {
+        keywords.push(keyword);
+      }
+    });
+
+    let keywordsInAns = new Map();
+    keywords.forEach((keyword) => {
+      textElements.forEach((e) => {
+        if (e.innerText.toLowerCase().includes(keyword)) {
+          keywordsInAns.set(keyword, true);
+        }
+      });
+    });
+
+    let qTextContainer = this.questionContainer.querySelector("div.title");
+    let errorKeywords = [];
+    keywords.forEach((keyword) => {
+      if (!keywordsInAns.get(keyword)) {
+        qTextContainer.innerHTML = qTextContainer.innerHTML.replaceAll(keyword, `<span class="sthError" style="border:${ERROR_BORDER_STYLE}">${keyword}</span>`);
+        errorKeywords.push(keyword);
+      }
+    });
+    if (errorKeywords.length > 0) {
+      this.addAlert(new Alert(STH_ALERTCODE.questionTextKeywordNotFound,
+        `WARNING: "<span style="color:darkred;">${errorKeywords.join(', ')}</span>" found in question text but not in answer options.`));
+    }
+    qTextContainer.querySelectorAll("span.sthError").forEach((e) => {
+      this.addAlertBorderElements(e);
+    });
   },
 };
 
