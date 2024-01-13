@@ -174,7 +174,8 @@ let SurveyTestHelper = {
     }
 
     // Turn off the auto-run (active) if requested using QCodePause
-    if (this.qCodePause===this.questionCode) {
+    const qCodePauseList = this.qCodePause.split(",").map(e => e.trim());
+    if (qCodePauseList.includes(this.questionCode)) {
       // console.log("My q code: ", this.questionCode);
       // console.log("My q code pause: ", this.qCodePause);
       // console.log("QCodePause matched QCode!!!");
