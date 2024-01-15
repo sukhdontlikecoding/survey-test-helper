@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name    Survey Test Helper
+// @name    Survey Test Helper - Test
 // @author  Elliot Kwan
 // @version 2.32.2
-// @grant   none
+// @grant   GM_log
 // @locale  en
 // @description A tool to help with survey testing
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/survey\/.*|\?r=.+)/
@@ -98,6 +98,7 @@ const ACTIVE_NAME = "STH_active";
 const ATTEMPTS_NAME = "STH_attempts";
 const COMMAND_OBJ_NAME = "STH_commands";
 const STH_HIDDEN = "STH_hidden";
+const QCODE_PAUSE = "STH_qCodePause";
 
 class Alert {
   constructor(code = 0, message = "Unknown alert. Keep an eye out.") {
@@ -114,6 +115,7 @@ let SurveyTestHelper = {
   active: false,
   attempts: 0,
   hidden: false,
+  qCodePause: "",
   questionCode: null,
   questionType: null,
   commands: null,
@@ -166,6 +168,15 @@ let SurveyTestHelper = {
       document.querySelector("button#movenextbtn").disabled = false;
     }
 
+    // Turn off the auto-run (active) if requested using QCodePause
+    const qCodePauseList = this.qCodePause.split(",").map(e => e.trim());
+    if (qCodePauseList.includes(this.questionCode)) {
+      // console.log("My q code: ", this.questionCode);
+      // console.log("My q code pause: ", this.qCodePause);
+      // console.log("QCodePause matched QCode!!!");
+      this.setActive(false); 
+    }
+
     if (this.active) {
       this.enterDummyResponses();
       this.clickNextButton();
@@ -176,8 +187,16 @@ let SurveyTestHelper = {
     this.alertDisplay = document.createElement("div");
     this.activeCheckbox = document.createElement("input");
     this.button = document.createElement("button");
+    this.qCodePauseInput = document.createElement("input");
 
     let chkBoxLabel = document.createElement("label");
+
+    // Question code input box
+    this.qCodePauseInput.placeholder = "Enter Question Code";
+    this.qCodePauseInput.value = this.qCodePause;
+    this.qCodePauseInput.addEventListener("blur", (event) => {
+      this.setQCodePause(event.target.value);
+    });
 
     // Auto Run Toggle Label
     chkBoxLabel.innerHTML = "Auto Run Toggle:";
@@ -221,7 +240,7 @@ let SurveyTestHelper = {
     this.uiContainer.style["border-radius"] = "10px";
     this.uiContainer.style["text-align"] = "center";
 
-    this.uiContainer.append(chkBoxLabel, this.button, this.alertDisplay);
+    this.uiContainer.append(this.qCodePauseInput, chkBoxLabel, this.button, this.alertDisplay);
   },
   initQuestionInfoDisplay: function () {
     let qCodeDisplay = document.createElement("div");
@@ -303,6 +322,8 @@ let SurveyTestHelper = {
     let activity = localStorage.getItem(ACTIVE_NAME);
     let hiddenVal = localStorage.getItem(STH_HIDDEN);
 
+    let qCodePause = localStorage.getItem(QCODE_PAUSE);
+
     let prevQuestion = sessionStorage.getItem("STH_qcode") || "Start";
     let attempts = sessionStorage.getItem(ATTEMPTS_NAME);
     let cmdObjStr = sessionStorage.getItem(COMMAND_OBJ_NAME);
@@ -326,6 +347,12 @@ let SurveyTestHelper = {
       this.attempts = Number(attempts);
     } else {
       sessionStorage.removeItem(ATTEMPTS_NAME);
+    }
+
+    if (qCodePause) {
+      this.qCodePause = qCodePause;
+    } else {
+      localStorage.setItem(QCODE_PAUSE, this.qCodePause);
     }
 
     if (cmdObjStr) {
@@ -401,6 +428,10 @@ let SurveyTestHelper = {
     if (prevBtn) {
       prevBtn.click();
     }
+  },
+  setQCodePause: function (val) {
+    this.qCodePause = val;
+    localStorage.setItem(QCODE_PAUSE, val);
   },
   setActive: function (val) {
     this.active = val;
