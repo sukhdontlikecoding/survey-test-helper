@@ -7,11 +7,6 @@
 // @description A tool to help with survey testing
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/survey\/.*|\?r=.+)/
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*|\?r=.+)/
-// @include /^.*localhost.*\/index\.php(\/[0-9]{6}.*|\?r=.+)/
-// @include /^.*localhost.*\/index\.php(\/survey\/.*|\?r=.+)/
-// @namespace https://greasyfork.org/users/560069
-// @downloadURL https://update.greasyfork.org/scripts/403172/Survey%20Test%20Helper.user.js
-// @updateURL https://update.greasyfork.org/scripts/403172/Survey%20Test%20Helper.meta.js
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
